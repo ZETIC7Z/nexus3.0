@@ -102,10 +102,10 @@ function useBaseScrape() {
           const source = getCachedMetadata().find(
             (src) => src.id === v.embedScraperId,
           );
-          if (!source) throw new Error("invalid source id");
+          // Gracefully handle unknown embed IDs instead of crashing
           const out: ScrapingSegment = {
             embedId: v.embedScraperId,
-            name: source.name,
+            name: source?.name ?? v.embedScraperId,
             id: v.id,
             status: "waiting",
             percentage: 0,
@@ -116,7 +116,7 @@ function useBaseScrape() {
       });
       setSourceOrder((s) => {
         const source = s.find((v) => v.id === evt.sourceId);
-        if (!source) throw new Error("invalid source id");
+        if (!source) return s; // Skip gracefully if source not tracked
         source.children = evt.embeds.map((v) => v.id);
         return [...s];
       });

@@ -57,7 +57,11 @@ export async function checkIsAnime(media: { tmdbId: string; type: "movie" | "sho
   }
 
   const tmdbKey = import.meta.env.VITE_TMDB_READ_API_KEY;
-  const endpoint = media.type === "movie" ? `/nexus-tmdb/3/movie/${media.tmdbId}` : `/nexus-tmdb/3/tv/${media.tmdbId}`;
+  // In production, /nexus-tmdb/3/ is not proxied — use direct TMDB API
+  const tmdbBase = import.meta.env.DEV
+    ? `/nexus-tmdb/3`
+    : `https://api.themoviedb.org/3`;
+  const endpoint = media.type === "movie" ? `${tmdbBase}/movie/${media.tmdbId}` : `${tmdbBase}/tv/${media.tmdbId}`;
   try {
     const res = await fetch(endpoint, {
       headers: {
