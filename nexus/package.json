@@ -6,7 +6,7 @@
   "homepage": "https://github.com/xp-technologies-dev/nexus",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "cd providers && pnpm install && pnpm run build && cd .. && vite build",
     "build:pwa": "cross-env VITE_PWA_ENABLED=true vite build",
     "update-and-build": "pnpm remove @nexus/providers && pnpm add github:nexus/providers#production && pnpm run build",
     "update-providers": "pnpm update @nexus/providers",
