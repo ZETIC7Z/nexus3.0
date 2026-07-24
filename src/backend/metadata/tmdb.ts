@@ -305,15 +305,19 @@ export async function get<T>(url: string, params?: object): Promise<T> {
   if (!result!) {
     const primaryAttempt = (async (): Promise<T> => {
       // ── First: try Vite dev-server proxy (hides API key + host in network tab) ──
-      try {
-        return await mwFetch<T>(encodeURI(url), {
-          headers: tmdbHeaders,
-          baseURL: "/nexus-tmdb/3/",
-          params: allParams,
-          signal: abortOnTimeout(5000),
-        });
-      } catch {
-        /* fall through to direct/CORS-proxy chain */
+      // Only use the proxy in development — in production Vercel serves index.html
+      // for unknown routes (200 OK with HTML), which silently bypasses the fallback.
+      if (import.meta.env.DEV) {
+        try {
+          return await mwFetch<T>(encodeURI(url), {
+            headers: tmdbHeaders,
+            baseURL: "/nexus-tmdb/3/",
+            params: allParams,
+            signal: abortOnTimeout(5000),
+          });
+        } catch {
+          /* fall through to direct/CORS-proxy chain */
+        }
       }
 
       // ── Fallback: direct or CORS proxy (production / extension users) ──
