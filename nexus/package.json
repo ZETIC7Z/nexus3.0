@@ -38,7 +38,7 @@
     "@huggingface/transformers": "^3.0.2",
     "@ladjs/country-language": "^1.0.3",
     "@marsidev/react-turnstile": "^0.7.2",
-    "@nexus/providers": "github:xp-technologies-dev/providers#production",
+    "@nexus/providers": "file:./providers",
     "@noble/hashes": "^1.8.0",
     "@plasmohq/messaging": "^0.6.2",
     "@react-spring/web": "^9.7.5",
