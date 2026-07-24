@@ -1,7 +1,0 @@
-node_modules/
-/lib
-coverage
-.env
-.eslintcache
-/lib-obf
-.DS_Store
