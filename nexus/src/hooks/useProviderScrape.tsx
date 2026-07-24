@@ -5,7 +5,8 @@ import { isExtensionActiveCached } from "@/backend/extension/messaging";
 import { prepareStream } from "@/backend/extension/streams";
 import { getCachedMetadata } from "@/backend/helpers/providerApi";
 import { getProviders } from "@/backend/providers/providers";
-import { getLiveNexusProviders } from "@/providers/nexus-providers-index";
+
+
 import { checkIsAnime, getAllowedSourceIds } from "@/providers/allowed-providers";
 import { getMediaKey } from "@/stores/player/slices/source";
 import { usePlayerStore } from "@/stores/player/store";

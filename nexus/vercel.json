@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/nexus-vidsrc/:path*",
+      "destination": "http://152.42.223.175:4001/:path*"
+    },
+    {
       "source": "/moviebox-api/:path*",
       "destination": "http://152.42.223.175:8000/:path*"
     },

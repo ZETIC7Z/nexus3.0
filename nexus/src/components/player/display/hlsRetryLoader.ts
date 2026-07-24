@@ -57,7 +57,7 @@ export class ArtemisRetryLoader extends DefaultLoader {
 
     if (!isExtensionActiveCached()) {
       const proxyBase = getLoadbalancedProxyUrl();
-      if (proxyBase && url && !url.includes("destination=")) {
+      if (proxyBase && url && !url.includes("destination=") && !url.includes("m3u8-proxy")) {
         context.url = `${proxyBase}?destination=${encodeURIComponent(url)}`;
         url = context.url;
       }

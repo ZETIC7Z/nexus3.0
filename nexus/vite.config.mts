@@ -238,9 +238,9 @@ export default defineConfig(({ mode }) => {
           secure: true,
           rewrite: (path) => path.replace(/^\/nexus-anilist/, ""),
         },
-        // ── VidSrc Local Docker ──────────────────────────────────────────
+        // ── VidSrc VPS Scraper (runs on :4001) ─────────────
         "/nexus-vidsrc": {
-          target: "http://localhost:3000",
+          target: "http://152.42.223.175:4001",
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/nexus-vidsrc/, ""),
         },

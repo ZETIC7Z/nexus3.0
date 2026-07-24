@@ -92,7 +92,7 @@ export async function checkIsAnime(media: { tmdbId: string; type: "movie" | "sho
 
 export function getAllowedSourceIds(mediaType: "movie" | "show", isAnime: boolean): string[] {
   if (isAnime) {
-    return ["nexus-zunime", "nexus-moviebox"];
+    return ["nexus-zunime", "nexus-moviebox", "nexus-vidsrc"];
   }
-  return ["nexus-moviebox"];
+  return ["nexus-moviebox", "nexus-vidsrc"];
 }
