@@ -1,0 +1,7 @@
+{
+  "name": "nexus-root",
+  "private": true,
+  "scripts": {
+    "build": "cd nexus && npm install && npm run build && cd .. && rm -rf dist && mv nexus/dist dist"
+  }
+}
