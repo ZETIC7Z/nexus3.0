@@ -1,0 +1,11 @@
+{
+  "name": "nexus-root",
+  "private": true,
+  "scripts": {
+    "install": "npm install -g pnpm@8.15.9 && cd nexus/providers && pnpm install && cd .. && pnpm install",
+    "build": "cd nexus/providers && pnpm run build && cd .. && pnpm run build && cd .. && rm -rf dist && rm -rf public && mv nexus/dist dist && cp -r dist public"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
