@@ -2,6 +2,6 @@
   "name": "nexus-root",
   "private": true,
   "scripts": {
-    "build": "cd nexus && npm install && npm run build && cd .. && rm -rf dist && rm -rf public && mv nexus/dist dist && cp -r dist public"
+    "build": "npm install -g pnpm && cd nexus && pnpm install && pnpm run build && cd .. && rm -rf dist && rm -rf public && mv nexus/dist dist && cp -r dist public"
   }
 }
