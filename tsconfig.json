@@ -1,0 +1,3 @@
+{
+  "extends": "./nexus/tsconfig.json"
+}
