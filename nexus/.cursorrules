@@ -1,0 +1,29 @@
+# NEXUS — Cursor / AI agent rules
+# (Full context: docs/PROJECT_CONTEXT.md, docs/BACKENDS.md, docs/AGENTS.md)
+
+NEXUS is a React+TS+Vite streaming app (rebrand of P-Stream/movie-web).
+It scrapes third-party sources via "providers"; metadata comes from TMDB.
+
+RULES:
+1. Never reintroduce P-Stream / Z-Stream / pstream / zstream branding.
+   Brand logo is public/pwa-logo.svg. App name is NEXUS everywhere.
+2. Only WORKING providers may appear in the source list and spinner.
+   Always build the list from getLiveNexusProviders()
+   (src/providers/nexus-providers-index.ts). Hide dead providers.
+3. MovieBox provider is MP4-ONLY. Drop DASH. (Player has no DASH support.)
+4. Every provider returns the same shape:
+   { embeds: [], stream: { id, type, playlist, flags, captions, qualities?, audioTracks? } }
+5. Original audio is the default track. Dub languages (MovieBox) are opt-in
+   via the player Audio menu (AudioTrackSelector.tsx + utils/player/audioTracks.ts).
+6. Secrets live ONLY in .env (VITE_-prefixed). Never hardcode tokens/URLs.
+
+BACKENDS:
+- enc-dec.app: decrypts VidLink/Videasy/VidFast/Hexa/yFlix payloads.
+- TMDB-Embed (HuggingFace): VITE_TMDB_EMBED_API_URL, provider rank 900.
+- MovieBox (VPS FastAPI): VITE_MOVIEBOX_API_URL, slug-based, multi-audio dubs.
+
+DEBUG PLAYBACK (in order): .env correctness → provider health →
+MovieBox audio field (adjust strategy A/B/C in moviebox-provider.ts,
+see BACKENDS.md §3.4) → CORS (set proxy env vars).
+
+COMMANDS: pnpm install; pnpm run dev (5173); pnpm run build; pnpm run preview.

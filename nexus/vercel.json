@@ -1,0 +1,69 @@
+{
+  "rewrites": [
+    {
+      "source": "/moviebox-api/:path*",
+      "destination": "http://152.42.223.175:8000/:path*"
+    },
+    {
+      "source": "/nexus-tmdb/:path*",
+      "destination": "https://api.themoviedb.org/:path*"
+    },
+    {
+      "source": "/nexus-zunime/:path*",
+      "destination": "https://zetianime-api.vercel.app/:path*"
+    },
+    {
+      "source": "/nexus-zunime-worker/:path*",
+      "destination": "https://zetianime-api.samxerz-zeticuz.workers.dev/:path*"
+    },
+    {
+      "source": "/nexus-anilist/:path*",
+      "destination": "https://graphql.anilist.co/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, s-maxage=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, s-maxage=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}

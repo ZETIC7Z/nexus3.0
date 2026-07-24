@@ -1,0 +1,25 @@
+import { useTranslation } from "react-i18next";
+
+import { FancyModal } from "./Modal";
+import { MwLink } from "../text/Link";
+
+export function SupportInfoModal({ id }: { id: string }) {
+  const { t } = useTranslation();
+
+  return (
+    <FancyModal id={id} title={t("home.support.title")} size="md">
+      <div className="space-y-4">
+        <p className="text-type-secondary">{t("home.support.explanation")}</p>
+        <p className="text-type-secondary">
+          {t("home.support.explanation2")}{" "}
+          <MwLink url="https://discord.gg/Jrj3w6t9mY">
+            {t("home.support.fluxer")}
+          </MwLink>
+        </p>
+        <div className="text-xs text-type-dimmed text-center">
+          {t("home.support.thankYou")}
+        </div>
+      </div>
+    </FancyModal>
+  );
+}

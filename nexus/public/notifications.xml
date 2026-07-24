@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>NEXUS Notifications</title>
+    <description>Site updates, feature announcements, and important alerts for NEXUS users</description>
+    <language>en</language>
+    <lastBuildDate>Fri, 24 Jul 2026 10:32:00 +08:00</lastBuildDate>
+    
+    <item>
+      <guid>nexus-notif-2026-07-24-xml-metadata-fix</guid>
+      <title>XML Notifications &amp; Metadata Null-Safety Deployed!</title>
+      <description>We have deployed stability and UI fixes across NEXUS:
+
+• XML Feed Repair: Fixed missing XML item tags in `notifications.xml` resolving browser XML parsing errors.
+• Metadata Safeguards: Added safe optional chaining for show metadata to ensure smooth episode loading.
+• Clean Linting &amp; Build: Resolved ESLint button type checks and verified 100% clean production build (`pnpm run build`).
+
+Enjoy streaming on NEXUS!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 24 Jul 2026 10:32:00 +08:00</pubDate>
+      <category>update</category>
+    </item>
+    
+    <item>
+      <guid>nexus-notif-2026-07-24-tmdb-speedup</guid>
+      <title>Instant Metadata Loading &amp; Anime Show Performance Fix!</title>
+      <description>We have deployed a major performance optimization for metadata loading:
+
+• Instant TMDB Metadata: Optimized TV series metadata loading for long-running shows (One Piece, Simpsons, Pokemon) by eliminating 20+ redundant season requests on page load!
+• Network Timeout Resilience: Increased TMDB API timeout threshold to prevent network aborts.
+• 100% Clean Build: Fixed all linting and TypeScript checks.
+
+Enjoy seamless streaming on NEXUS!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 24 Jul 2026 10:21:00 +08:00</pubDate>
+      <category>update</category>
+    </item>
+    
+    <item>
+      <guid>nexus-notif-2026-07-24-zunime-dubs-fix</guid>
+      <title>Zunime Anime Provider &amp; Multi-Audio Dubs Fully Fixed!</title>
+      <description>We have resolved provider scraping issues and restored audio dubs:
+
+• Zunime Anime Fix: Resolved the `invalid source id` issue by registering Zunime embed scrapers globally in the provider registry.
+• Multi-Audio Dub Restoration: Fixed audio track state syncing so MovieBox multi-audio dubs (Tagalog, Hindi, Spanish, etc.) now appear and switch seamlessly in the player Audio menu!
+• ESLint &amp; Clean Build: Fixed button type lint warning and verified clean production build (`pnpm run build`).
+
+Enjoy watching on NEXUS!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 24 Jul 2026 10:18:00 +08:00</pubDate>
+      <category>update</category>
+    </item>
+    
+    <item>
+      <guid>nexus-notif-2026-07-24-subtitles-fix</guid>
+      <title>Automatic Subtitles &amp; System Improvements Deployed!</title>
+      <description>We have implemented system fixes and subtitle improvements:
+
+• Auto-Default Subtitles: The player now automatically selects and displays English subtitles by default without requiring manual configuration when they are available!
+• External Subtitle Sources Restored: Added robust integrations for fetching external subtitle sources.
+• Build Fixes: Addressed background issues to ensure maximum reliability and a faster streaming experience.
+
+Enjoy your seamless streaming experience on NEXUS!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 24 Jul 2026 10:07:00 +0800</pubDate>
+      <category>update</category>
+    </item>
+    
+    <item>
+      <guid>nexus-notif-2026-07-24-provider-unification</guid>
+      <title>Provider Architecture Streamlined &amp; Unified in One Place!</title>
+      <description>We have updated and unified our streaming provider architecture:
+
+• Unified Provider List: Combined MovieBox with all official built-in P-Stream sources so all working providers display seamlessly in one single area.
+• Deprecated Sources Cleaned Up: Removed vidlink, videasy, vidfast, hexa, and yflix sources to focus purely on MovieBox and official built-in providers.
+
+Enjoy high-speed streaming on NEXUS!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 24 Jul 2026 03:08:00 +0800</pubDate>
+      <category>update</category>
+    </item>
+    
+    <item>
+      <guid>nexus-notif-2026-07-24-tmdb-removal</guid>
+      <title>TMDB Provider Removed &amp; Streamlined Provider Pipeline</title>
+      <description>We have updated the streaming provider pipeline:
+
+• Removed TMDB / NEXUS Embed Provider: Completely removed `tmdbProvider` (`nexus-tmdb`) and its health probes.
+• MovieBox &amp; Built-In Providers: Maintained `MovieBox` VPS as our primary multi-audio provider alongside our default built-in sources.
+
+Enjoy streaming on NEXUS!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 24 Jul 2026 02:50:00 +0800</pubDate>
+      <category>update</category>
+    </item>
+    
+    <item>
+      <guid>nexus-notif-2026-07-24-full-audit</guid>
+      <title>Full Project Audit, Codebase Cleanliness &amp; Build Verification Complete!</title>
+      <description>We have performed a full project review, codebase cleanup, and build verification:
+
+• Full Architecture Audit: Verified custom providers, MovieBox multi-audio dub strategies, and provider health checks.
+• Clean Production Build: Fixed all lint warnings and verified 100% clean production build (`pnpm run build`).
+• Complete Rebrand Alignment: Verified zero legacy P-Stream/Z-Stream branding across code, PWA manifest, and HTML templates.
+
+Thank you for using NEXUS!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 24 Jul 2026 02:15:00 +0800</pubDate>
+      <category>update</category>
+    </item>
+    
+    <item>
+      <guid>nexus-notif-2026-07-18-docker-verify</guid>
+      <title>EMBED-API Docker Container Verified Across All 14 Endpoints!</title>
+      <description>We have successfully deployed and verified the EMBED-API streaming backend inside Docker:
+
+• 100% Endpoint Pass Rate: Verified all 14 REST and auth endpoints against our running Docker container with zero errors.
+• High-Speed Stream Aggregation: Verified returning 37 HD streams for movies and 73 HD streams for TV series across multiple audio dubs and subtitles directly from our Docker image.
+• Universal Route &amp; Query Compatibility: Patched `apiServer.js` to support `:type = 'tv'` alongside `'movie'` and `'series'`, plus `?s=`/`?e=` query parameter fallbacks for seamless client integration.
+
+Thank you for being part of the NEXUS community!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Sat, 18 Jul 2026 15:25:00 +0800</pubDate>
+      <category>update</category>
+    </item>
+
+
+    <item>
+      <guid>nexus-notif-2026-07-18-embed-api</guid>
+      <title>EMBED-API &amp; MovieBox Engine Overhaul Deployed!</title>
+      <description>We have deployed a massive backend streaming upgrade to power your NEXUS experience:
+
+• MovieBox JWT Token Bridge: Resolved token expiration issues and optimized movie indexing, unlocking 13+ high-speed streams for movies and 40+ streams for TV series across multiple audio dubs and subtitles.
+• Strict Anime Isolation: Separated regular Movie &amp; TV series lookups from Anime sources (`anikoto`, `anikai`, etc.), ensuring lightning-fast search latency without interference.
+• Ultra-Fast Alternative Sources: Added clean embed providers (`vsembed.ru` and `vidsrcme.ru`) while disabling slow legacy scrapers for instant video playback.
+• Custom Admin Portal: Modernized the backend login box with real-time status and rate-limit lockouts.
+
+Join our Discord for support or to share feedback!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Sat, 18 Jul 2026 15:10:00 +0800</pubDate>
+      <category>update</category>
+    </item>
+
+    <item>
+      <guid>nexus-notif-2026-07-18-88pct</guid>
+      <title>Congratulations! NEXUS Reaches 88% Completion!</title>
+      <description>We are thrilled to announce that the new NEXUS streaming platform has officially reached 88% completion after an incredible few days of rapid development!
+
+Our architecture is stronger, faster, and more secure than ever before. We are fine-tuning the remaining components as we prepare for our grand public launch. Thank you for being part of our community!
+
+JOIN OUR DISCORD SERVER for live progress updates, early previews, and support! Link below.
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Sat, 18 Jul 2026 10:51:00 +0800</pubDate>
+      <category>announcement</category>
+    </item>
+
+    <item>
+      <guid>nexus-notif-2026-07-18-updates</guid>
+      <title>Major Platform Updates: MovieBox, Dual-Auth &amp; UI Overhaul</title>
+      <description>We have deployed major updates and improvements across the NEXUS ecosystem:
+
+• MovieBox Streaming Provider: Restored and fully optimized as our primary high-speed source with robust HLS multi-server video delivery.
+• Sleek Frosted-Glass Login Box: Upgraded to a custom Netflix-inspired frosted overlay featuring real-time password strength bars and clean dual-auth switching.
+• Multi-Device Passkey &amp; Roaming: Enabled cross-device WebAuthn passkey registration, allowing you to save and sync credentials across mobile phones, hardware keys, and password managers (1Password / Bitwarden).
+• Global UI Alignment: Polished top header controls, integrated instant passkey generation right inside Account Settings, and set responsive detail overlays as the global default.
+
+Join our Discord or reach out on Facebook for questions or feedback!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Sat, 18 Jul 2026 10:00:00 +0800</pubDate>
+      <category>update</category>
+    </item>
+
+  </channel>
+</rss>
