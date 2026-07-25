@@ -13,6 +13,18 @@
       "destination": "https://api.themoviedb.org/:path*"
     },
     {
+      "source": "/nexus-zunime/:path*",
+      "destination": "https://zetianime-api.vercel.app/:path*"
+    },
+    {
+      "source": "/nexus-zunime-worker/:path*",
+      "destination": "https://zetianime-api.samxerz-zeticuz.workers.dev/:path*"
+    },
+    {
+      "source": "/nexus-anilist/:path*",
+      "destination": "https://graphql.anilist.co/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }
