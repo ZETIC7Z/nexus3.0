@@ -36,10 +36,13 @@ const EXTERNAL_PROVIDER_IDS = new Set(["nexus-zunime"]);
 // A probe just checks "is the backend up?" — cheap, no full scrape.
 function probeUrlFor(id: string): string | null {
   const mb = (import.meta.env.VITE_MOVIEBOX_API_URL as string | undefined)?.replace(/\/$/, "");
+  const vs = (import.meta.env.VITE_VIDSRC_API_URL as string | undefined)?.replace(/\/$/, "");
 
   switch (id) {
     case "nexus-moviebox":
       return mb ? `${mb}/` : null; // FastAPI root returns endpoint list
+    case "nexus-vidsrc":
+      return vs ? `${vs}/extract?type=movie&tmdb_id=550` : null; // VidSrc probe with a known movie
     case "nexus-zunime":
       return `${ZUNIME_WORKER_URL}/`; // Probe ZETIANIME worker API root
     default:

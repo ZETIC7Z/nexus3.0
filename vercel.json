@@ -1,6 +1,18 @@
 {
   "rewrites": [
     {
+      "source": "/moviebox-api/:path*",
+      "destination": "http://152.42.223.175:8000/:path*"
+    },
+    {
+      "source": "/nexus-vidsrc/:path*",
+      "destination": "http://152.42.223.175:4000/:path*"
+    },
+    {
+      "source": "/nexus-tmdb/:path*",
+      "destination": "https://api.themoviedb.org/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }
