@@ -6,7 +6,7 @@
     },
     {
       "source": "/nexus-vidsrc/:path*",
-      "destination": "http://152.42.223.175:4000/:path*"
+      "destination": "http://152.42.223.175:4001/:path*"
     },
     {
       "source": "/nexus-tmdb/:path*",
