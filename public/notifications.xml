@@ -4,7 +4,24 @@
     <title>NEXUS Notifications</title>
     <description>Site updates, feature announcements, and important alerts for NEXUS users</description>
     <language>en</language>
-    <lastBuildDate>Fri, 24 Jul 2026 10:32:00 +08:00</lastBuildDate>
+    <lastBuildDate>Fri, 25 Jul 2026 07:53:00 +08:00</lastBuildDate>
+    
+    <item>
+      <guid>nexus-notif-2026-07-25-provider-proxy-fix</guid>
+      <title>🔧 MovieBox &amp; VidSrc Proxy Routing Fixed!</title>
+      <description>Critical fixes deployed to restore streaming sources:
+
+• Fixed "invalid source id" crash: graceful fallback when embed IDs are not in metadata cache — no more fatal crashes on movie pages.
+• Fixed MovieBox &amp; VidSrc proxy: Vercel now correctly routes /moviebox-api/* → VPS:8000 and /nexus-vidsrc/* → VPS:4000 instead of serving index.html.
+• Fixed TMDB proxy in production: /nexus-tmdb/* now proxies directly to api.themoviedb.org via Vercel rewrites.
+• Fixed checkIsAnime in production: no longer calls the broken dev proxy path.
+
+MovieBox 🔥 and VidSrc 🔗 should now work. Reload the page to get the update!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 25 Jul 2026 07:53:00 +08:00</pubDate>
+      <category>fix</category>
+    </item>
     
     <item>
       <guid>nexus-notif-2026-07-24-xml-metadata-fix</guid>
