@@ -24,27 +24,14 @@ const PROBE_TIMEOUT = 6000;
 const HEALTH_TTL = 5 * 60 * 1000; // re-probe every 5 min
 const healthCache = new Map<string, ProviderHealth>();
 
-// ZETIANIME-API endpoints — worker is primary, Vercel is fallback
-const ZUNIME_WORKER_URL = "https://zetianime-api.samxerz-zeticuz.workers.dev";
-const ZUNIME_VERCEL_URL = "https://zetianime-api.vercel.app";
-
-// Providers that are external (not self-hosted). These are ALWAYS shown in the
-// source list — they will fail gracefully during scrape rather than disappearing.
-const EXTERNAL_PROVIDER_IDS = new Set(["nexus-zunime"]);
-
 // ── Per-provider probe endpoints ────────────────────────────────────────────
 // A probe just checks "is the backend up?" — cheap, no full scrape.
 function probeUrlFor(id: string): string | null {
   const mb = (import.meta.env.VITE_MOVIEBOX_API_URL as string | undefined)?.replace(/\/$/, "");
-  const vs = (import.meta.env.VITE_VIDSRC_API_URL as string | undefined)?.replace(/\/$/, "");
 
   switch (id) {
     case "nexus-moviebox":
       return mb ? `${mb}/` : null; // FastAPI root returns endpoint list
-    case "nexus-vidsrc":
-      return vs ? `${vs}/extract?type=movie&tmdb_id=550` : null; // VidSrc probe with a known movie
-    case "nexus-zunime":
-      return `${ZUNIME_WORKER_URL}/`; // Probe ZETIANIME worker API root
     default:
       return null;
   }
@@ -57,17 +44,12 @@ async function probeOne(id: string, name: string): Promise<ProviderHealth> {
   const url = probeUrlFor(id);
   const start = performance.now();
 
-  // External providers (e.g. free APIs without a VPS) are always shown —
-  // they degrade gracefully during scrape rather than vanishing from source list.
   if (!url) {
-    const alwaysHealthy = EXTERNAL_PROVIDER_IDS.has(id);
-    const h: ProviderHealth = { id, name, healthy: alwaysHealthy, latencyMs: null, checkedAt: Date.now() };
+    const h: ProviderHealth = { id, name, healthy: false, latencyMs: null, checkedAt: Date.now() };
     healthCache.set(id, h);
     return h;
   }
 
-  // Probe the primary URL with a timeout; for external providers, also try
-  // the fallback URL before giving up.
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
   let healthy = false;
@@ -76,18 +58,7 @@ async function probeOne(id: string, name: string): Promise<ProviderHealth> {
     // Any non-5xx response means the backend is alive.
     healthy = res.status < 500;
   } catch {
-    // If primary probe failed and this is an external provider, try Vercel fallback
-    if (id === "nexus-zunime") {
-      try {
-        const res2 = await fetch(getProxiedUrl(`${ZUNIME_VERCEL_URL}/`), { method: "GET", mode: "cors" });
-        healthy = res2.status < 500;
-      } catch {
-        // Both failed — still show as healthy (graceful scrape failure)
-        healthy = true;
-      }
-    } else {
-      healthy = false;
-    }
+    healthy = false;
   } finally {
     clearTimeout(t);
   }

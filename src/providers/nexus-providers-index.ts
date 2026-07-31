@@ -1,29 +1,21 @@
 // nexus-providers-index.ts
 // NEXUS — Provider Registry
 // ---------------------------------------------------------------------------
-// Custom NEXUS providers merged with built-in P-Stream sources.
+// Custom NEXUS providers — MovieBox only.
+// Zunime and VidSrc are disabled; only MovieBox is active.
 // ---------------------------------------------------------------------------
 
 import { movieboxProvider } from "./moviebox-provider";
-import { zunimeProvider, zunimeEmbeds } from "./zunime-provider";
-import { vidsrcProvider } from "./vidsrc-provider";
 import { getHealthyProviders, type ProbeableProvider } from "./provider-health";
 
 // Ordered by rank (highest first)
 export const nexusCustomProviders = [
-  zunimeProvider,    // 1050 — Zunime (ZETIANIME-API, anime only)
   movieboxProvider,  // 1000 — MovieBox (self-hosted VPS, MP4 + multi-audio dubs)
-  vidsrcProvider,    //  900 — VidSrc (self-hosted scraper, HLS via headless browser)
 ] as const;
 
-export const nexusCustomEmbeds = [
-  ...zunimeEmbeds,
-] as const;
+export const nexusCustomEmbeds: never[] = [];
 
 export { movieboxProvider };
-export { zunimeProvider };
-export { zunimeEmbeds };
-export { vidsrcProvider };
 
 export { getHealthyProviders, getHealthSnapshot, invalidateHealth } from "./provider-health";
 export type { ProviderHealth } from "./provider-health";

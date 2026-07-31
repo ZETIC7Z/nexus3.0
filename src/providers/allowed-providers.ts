@@ -1,10 +1,10 @@
 // allowed-providers.ts
 // NEXUS — Per-Media Allowed Provider Registry
 // ---------------------------------------------------------------------------
-// Configures allowed sources per media type:
-//   1. Movies (non-anime): MovieBox, LookMovie, PelisplusHD
-//   2. TV Shows (non-anime): MovieBox, PelisplusHD
-//   3. Anime (movie or show): Zunime, MovieBox
+// Only MovieBox is active. All media types (movies, TV shows, anime) go
+// through MovieBox. Built-in subtitle sources (OpenSubtitles etc.) are used
+// for movies and TV; anime has no external subtitles — player uses whatever
+// captions MovieBox returns (if any).
 // ---------------------------------------------------------------------------
 
 const animeCache = new Map<string, boolean>();
@@ -94,9 +94,13 @@ export async function checkIsAnime(media: { tmdbId: string; type: "movie" | "sho
   return false;
 }
 
-export function getAllowedSourceIds(mediaType: "movie" | "show", isAnime: boolean): string[] {
-  if (isAnime) {
-    return ["nexus-zunime", "nexus-moviebox", "nexus-vidsrc"];
-  }
-  return ["nexus-moviebox", "nexus-vidsrc"];
+/**
+ * Only MovieBox is active.
+ * - Anime: MovieBox only (subtitles come from the built-in OpenSubtitles
+ *   provider via the player's default subtitle system; MovieBox anime
+ *   streams have no embedded subs so the player falls back gracefully).
+ * - Movies / TV shows: MovieBox only.
+ */
+export function getAllowedSourceIds(_mediaType: "movie" | "show", _isAnime: boolean): string[] {
+  return ["nexus-moviebox"];
 }
