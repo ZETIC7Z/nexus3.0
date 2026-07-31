@@ -19,6 +19,10 @@ This repository is optimized for **Vercel Deployment** with exclusive MovieBox (
 
 ## Automated Project Changelog
 
+### [July 31, 2026 - 13:30] — Kamatera VPS Migration & TypeError Fix
+- **VPS Migration**: Updated `vite.config.mts` and `vercel.json` to proxy `/moviebox-api` and `/nexus-vidsrc` to the new Kamatera VPS IP (`45.130.165.139`) because the old one expired. MovieBox and VidSrc are now fully functional again.
+- **Fixed TypeError Crash**: Fixed `TypeError: Cannot read properties of null (reading 'skipForward5')` in `KeyboardCommandsEditModal.tsx` by providing a fallback to `DEFAULT_KEYBOARD_SHORTCUTS` if the user's `localStorage` has a corrupted or missing `keyboardShortcuts` state.
+
 ### [July 25, 2026 - 00:30] — VidSrc and Zunime API Fixes
 - **VidSrc Stability:** Updated the VidSrc server on the VPS to automatically recreate the Playwright browser if it crashes or disconnects.
 - **VidSrc Connectivity:** Updated `vercel.json` to proxy `/nexus-vidsrc` to port `4001` on the VPS to match where the node process runs, fixing the "Failed to scrape" error in production.

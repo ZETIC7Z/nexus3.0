@@ -4,7 +4,20 @@
     <title>NEXUS Notifications</title>
     <description>Site updates, feature announcements, and important alerts for NEXUS users</description>
     <language>en</language>
-    <lastBuildDate>Fri, 25 Jul 2026 07:53:00 +08:00</lastBuildDate>
+    <lastBuildDate>Fri, 31 Jul 2026 13:30:00 +08:00</lastBuildDate>
+    <item>
+      <guid>nexus-notif-2026-07-31-kamatera-migration</guid>
+      <title>🚀 Server Migration &amp; Bug Fixes Completed!</title>
+      <description>We have successfully migrated MovieBox and VidSrc providers to a new high-speed VPS:
+
+• MovieBox &amp; VidSrc Migration: Both providers are now securely hosted on the new Kamatera VPS. We've updated our frontend proxy routing to use the new server IP. Everything functions exactly as before, with renewed stability!
+• Fixed Keyboard Shortcuts Crash: Resolved a bug where corrupted local storage could trigger a "Cannot read properties of null (reading 'skipForward5')" crash on load. The app now properly restores default shortcuts if yours are missing.
+
+Happy Streaming!
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 31 Jul 2026 13:30:00 +08:00</pubDate>
+    </item>
     <item>
       <guid>nexus-notif-2026-07-25-zunime-vidsrc-proxy-fix</guid>
       <title>🔧 Zunime Anime &amp; VidSrc Scraper Restored in Production!</title>
