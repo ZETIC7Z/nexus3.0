@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/moviebox-api/:path*",
-      "destination": "http://152.42.223.175:8000/:path*"
+      "destination": "http://45.130.165.139:8000/:path*"
     },
     {
       "source": "/nexus-vidsrc/:path*",
-      "destination": "http://152.42.223.175:4001/:path*"
+      "destination": "http://45.130.165.139:4001/:path*"
     },
     {
       "source": "/nexus-tmdb/:path*",
