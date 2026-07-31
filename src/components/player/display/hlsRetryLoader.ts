@@ -67,6 +67,7 @@ export class ArtemisRetryLoader extends DefaultLoader {
       super.load(context, config, callbacks);
       return;
     }
+
     const originalSuccess = callbacks.onSuccess;
     let attempts = 0;
     let delay = BASE_DELAY;

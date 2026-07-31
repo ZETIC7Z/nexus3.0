@@ -85,6 +85,7 @@
     "@babel/core": "^7.28.5",
     "@babel/preset-env": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
+    "@playwright/test": "1.61.1",
     "@rollup/wasm-node": "^4.52.5",
     "@types/chromecast-caf-sender": "^1.0.11",
     "@types/crypto-js": "^4.2.2",

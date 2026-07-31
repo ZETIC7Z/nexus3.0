@@ -24,9 +24,9 @@ import { isExtensionActiveCached } from "@/backend/extension/messaging";
 import { getLoadbalancedProxyUrl } from "@/backend/providers/fetchers";
 
 // ── Config (base URL comes from .env → VITE_MOVIEBOX_API_URL) ───────────────
-const MOVIEBOX_BASE: string =
-  (import.meta.env.VITE_MOVIEBOX_API_URL as string | undefined)?.replace(/\/$/, "") ??
-  "/moviebox-api";
+// MovieBox requests always use the same-origin route. The Vercel function
+// (and Vite dev proxy) injects the upstream URL and secret server-side.
+const MOVIEBOX_BASE = "/api/moviebox";
 
 const TIMEOUT = 15000;
 
@@ -36,12 +36,17 @@ async function getJson<T>(url: string): Promise<T> {
   const t = setTimeout(() => ctrl.abort(), TIMEOUT);
   
   let targetUrl = url;
-  const headers: Record<string, string> = { 
+  const headers: Record<string, string> = {
     Accept: "application/json",
-    "X-NEXUS-SECRET": "zarfo1-posnew-secret-vps-key"
   };
 
-  if (!isExtensionActiveCached() && !url.startsWith("/") && !url.startsWith(".") && !url.includes("localhost") && !url.includes("127.0.0.1")) {
+  if (
+    !isExtensionActiveCached() &&
+    !url.startsWith("/") &&
+    !url.startsWith(".") &&
+    !url.includes("localhost") &&
+    !url.includes("127.0.0.1")
+  ) {
     const proxyBase = getLoadbalancedProxyUrl();
     if (proxyBase && url && !url.includes("destination=")) {
       targetUrl = `${proxyBase}?destination=${encodeURIComponent(url)}`;
@@ -327,18 +332,13 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
     isAnime = true;
   }
   if (!isAnime && isShow) {
-    const tmdbKey = import.meta.env.VITE_TMDB_READ_API_KEY;
-    if (tmdbKey) {
-      try {
-        // Use Vite proxy (/nexus-tmdb) instead of direct TMDB call so the API
-        // key + host are never visible in the browser's network tab.
-        const response = await fetch(`/nexus-tmdb/3/tv/${media.tmdbId}`, {
-          headers: {
-            Authorization: `Bearer ${tmdbKey}`,
-            Accept: "application/json",
-          },
-        });
-        if (response.ok) {
+    try {
+      const response = await fetch(`/api/tmdb/tv/${media.tmdbId}`, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      if (response.ok) {
           const data = await response.json();
           const genres = data.genres ?? [];
           const originCountry = data.origin_country ?? [];
@@ -347,10 +347,9 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
           if (isAnimation && isJapanese) {
             isAnime = true;
           }
-        }
-      } catch (e) {
-        console.error("Failed to check if show is anime from TMDB:", e);
       }
+    } catch (e) {
+      console.error("Failed to check if show is anime from TMDB:", e);
     }
   }
 
@@ -379,19 +378,13 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
   // 4. Fetch the primary stream
   const primary = await fetchStreamsForLang(subjectId, match.slug, querySeason, queryEpisode);
 
-  // 5. Video Player Waterfall Fallback: Priority 1 (HLS .m3u8) -> Priority 2 (MP4)
-  // Note: DASH (.mpd) manifests are skipped because standard HTML5 / HLS.js player cannot play DASH without dash.js.
-  const hlsSource = (primary.hls ?? []).find(
-    (h: any) => typeof h.url === "string" && h.url.trim().length > 0 && h.url.includes(".m3u8"),
-  ) ?? (primary.sources ?? []).find(
-    (s: any) => s.format?.toLowerCase() === "hls" && typeof s.url === "string" && s.url.trim().length > 0 && s.url.includes(".m3u8"),
-  );
-
+  // 5. MovieBox is intentionally MP4-only. HLS and DASH responses are
+  // ignored because MovieBox uses muxed MP4 files for language variants.
   const mp4Sources = (primary.sources ?? []).filter(
     (s: any) => s.format?.toLowerCase() === "mp4" && typeof s.url === "string" && s.url.trim().length > 0,
   );
 
-  if (!hlsSource && !mp4Sources.length) {
+  if (!mp4Sources.length) {
     throw new Error("MovieBox: no valid playable sources found");
   }
 
@@ -399,31 +392,19 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
     if (!url) return url;
     if (url.includes("/api/proxy")) return url;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const base = origin ? `${origin}/moviebox-api` : MOVIEBOX_BASE;
+    const base = origin ? `${origin}/api/moviebox` : MOVIEBOX_BASE;
     return `${base}/api/proxy?url=${encodeURIComponent(url)}`;
   }
 
-  let streamType: "hls" | "file" = "file";
-  let bestUrl = "";
-
-  if (hlsSource) {
-    streamType = "hls";
-    bestUrl = proxyViaMovieBox(hlsSource.url);
-  } else {
-    streamType = "file";
-    const sortedMp4 = [...mp4Sources].sort((a, b) => {
-      const q = (r: string) => parseInt(r.replace(/\D/g, ""), 10) || 0;
-      return q(b.resolution) - q(a.resolution);
-    });
-    bestUrl = proxyViaMovieBox(sortedMp4[0]!.url);
-  }
+  const streamType = "file" as const;
+  const sortedMp4 = [...mp4Sources].sort((a, b) => {
+    const q = (r: string) => parseInt(r.replace(/\D/g, ""), 10) || 0;
+    return q(b.resolution) - q(a.resolution);
+  });
+  const bestUrl = proxyViaMovieBox(sortedMp4[0]!.url);
 
   const qualities: Record<string, { type: "mp4"; url: string }> = {};
   if (streamType === "file") {
-    const sortedMp4 = [...mp4Sources].sort((a, b) => {
-      const q = (r: string) => parseInt(r.replace(/\D/g, ""), 10) || 0;
-      return q(b.resolution) - q(a.resolution);
-    });
     for (const s of sortedMp4) {
       if (!s.url || !s.url.trim()) continue;
       const key = normalizeQuality(s.resolution);
@@ -462,12 +443,10 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
             querySeason,
             queryEpisode,
           );
-          const dubDash = (dubStreams.dash ?? []).find((d: any) => d.url);
-          const dubHls = (dubStreams.hls ?? []).find((h: any) => h.url);
           const dubMp4 = (dubStreams.sources ?? []).find(
             (s: any) => s.format?.toLowerCase() === "mp4" && s.url,
           );
-          const dubUrl = dubDash?.url ?? dubHls?.url ?? dubMp4?.url;
+          const dubUrl = dubMp4?.url;
 
           if (dubUrl) {
             audioTracks.push({

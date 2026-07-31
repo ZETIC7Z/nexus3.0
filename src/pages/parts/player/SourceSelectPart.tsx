@@ -164,12 +164,19 @@ export function SourceSelectPart(props: { media: ScrapeMedia }) {
   const activeSourceId = usePlayerStore((s) => s.sourceId);
 
   const [live, setLive] = React.useState<{ id: string; name: string }[]>([]);
+  const [liveLoaded, setLiveLoaded] = React.useState(false);
 
   useEffect(() => {
     let active = true;
-    getLiveNexusProviders().then((p) => {
-      if (active) setLive(p);
-    });
+    getLiveNexusProviders()
+      .then((p) => {
+        if (!active) return;
+        setLive(p);
+        setLiveLoaded(true);
+      })
+      .catch(() => {
+        if (active) setLiveLoaded(true);
+      });
     return () => {
       active = false;
     };
@@ -181,8 +188,14 @@ export function SourceSelectPart(props: { media: ScrapeMedia }) {
 
     const isAnime = isAnimeByTitle(props.media.title, props.media.tmdbId);
     const allowedIds = getAllowedSourceIds(metaType, isAnime);
+    const liveIds = new Set(live.map((provider) => provider.id));
     const allSources = getCachedMetadata()
-      .filter((v) => v.type === "source" && allowedIds.includes(v.id))
+      .filter(
+        (v) =>
+          v.type === "source" &&
+          allowedIds.includes(v.id) &&
+          (!liveLoaded || liveIds.has(v.id)),
+      )
       .sort((a, b) => allowedIds.indexOf(a.id) - allowedIds.indexOf(b.id));
 
 
@@ -236,6 +249,7 @@ export function SourceSelectPart(props: { media: ScrapeMedia }) {
     lastSuccessfulSource,
     enableLastSuccessfulSource,
     live,
+    liveLoaded,
   ]);
 
   if (selectedSourceId) {

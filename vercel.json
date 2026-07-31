@@ -1,30 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/moviebox-api/:path*",
-      "destination": "http://45.130.165.139:8000/:path*"
-    },
-    {
-      "source": "/nexus-vidsrc/:path*",
-      "destination": "http://45.130.165.139:4001/:path*"
-    },
-    {
-      "source": "/nexus-tmdb/:path*",
-      "destination": "https://api.themoviedb.org/:path*"
-    },
-    {
-      "source": "/nexus-zunime/:path*",
-      "destination": "https://zetianime-api.vercel.app/:path*"
-    },
-    {
-      "source": "/nexus-zunime-worker/:path*",
-      "destination": "https://zetianime-api.samxerz-zeticuz.workers.dev/:path*"
-    },
-    {
-      "source": "/nexus-anilist/:path*",
-      "destination": "https://graphql.anilist.co/:path*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/"
     }
@@ -42,8 +18,16 @@
           "value": "DENY"
         },
         {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(self), geolocation=(), payment=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
         },
         {
           "key": "Cache-Control",

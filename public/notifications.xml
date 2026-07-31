@@ -40,11 +40,11 @@ Please reload the page (or clear cache) to enjoy stable streaming for both movie
       <description>Critical fixes deployed to restore streaming sources:
 
 • Fixed "invalid source id" crash: graceful fallback when embed IDs are not in metadata cache — no more fatal crashes on movie pages.
-• Fixed MovieBox &amp; VidSrc proxy: Vercel now correctly routes /moviebox-api/* → VPS:8000 and /nexus-vidsrc/* → VPS:4000 instead of serving index.html.
-• Fixed TMDB proxy in production: /nexus-tmdb/* now proxies directly to api.themoviedb.org via Vercel rewrites.
-• Fixed checkIsAnime in production: no longer calls the broken dev proxy path.
+• Fixed MovieBox proxy routing through the secured same-origin API function.
+• Fixed TMDB metadata and anime detection through the secured same-origin API function.
+• Fixed checkIsAnime in production: it now uses the same API route as local development.
 
-MovieBox 🔥 and VidSrc 🔗 should now work. Reload the page to get the update!
+MovieBox 🔥 and the active NEXUS providers should now work. Reload the page to get the update!
       </description>
       <link>https://discord.gg/Jrj3w6t9mY</link>
       <pubDate>Fri, 25 Jul 2026 07:53:00 +08:00</pubDate>

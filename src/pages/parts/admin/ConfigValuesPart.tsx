@@ -109,7 +109,9 @@ export function ConfigValuesPart() {
       <ConfigValue name="Application version">v{appVersion}</ConfigValue>
       <ConfigValue name="Backend requests">{accountNumber}</ConfigValue>
       <ConfigValue name="Total User Accounts">{allAccounts}</ConfigValue>
-      <ConfigValue name="Backend URL">{backendUrl}</ConfigValue>
+      <ConfigValue name="Backend connection">
+        {backendUrl ? "Configured (hidden)" : "Not configured"}
+      </ConfigValue>
     </>
   );
 }

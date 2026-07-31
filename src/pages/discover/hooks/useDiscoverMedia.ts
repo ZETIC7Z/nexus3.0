@@ -40,7 +40,6 @@ import type {
   UseDiscoverMediaProps,
   UseDiscoverMediaReturn,
 } from "@/pages/discover/types/discover";
-import { conf } from "@/setup/config";
 import { useLanguageStore } from "@/stores/language";
 import { getTmdbLanguageCode } from "@/utils/locale/language";
 import { detectUserLanguage, detectUserRegion } from "@/utils/locale/userRegion";
@@ -81,7 +80,6 @@ export function useDiscoverOptions(mediaType: MediaType) {
 
       try {
         const data = await get<any>(`/genre/${mediaType}/list`, {
-          api_key: conf().TMDB_READ_API_KEY,
           language: formattedLanguage,
         });
         setGenres(data.genres.slice(0, 50));
@@ -154,7 +152,6 @@ export function useDiscoverMedia({
         const region = detectUserRegion();
 
         const data = await get<any>(endpoint, {
-          api_key: conf().TMDB_READ_API_KEY,
           language: formattedLanguage,
           region,
           ...params,
@@ -213,8 +210,7 @@ export function useDiscoverMedia({
           const endpoint = `/${mediaType}/${tmdbId}`;
           try {
             const data = await get<any>(endpoint, {
-              api_key: conf().TMDB_READ_API_KEY,
-              language: formattedLanguage,
+                  language: formattedLanguage,
             });
             return {
               ...data,
@@ -307,7 +303,6 @@ export function useDiscoverMedia({
       const mediaPromises = picksToFetch.map(async (item) => {
         const endpoint = `/${mediaType}/${item.id}`;
         const data = await get<any>(endpoint, {
-          api_key: conf().TMDB_READ_API_KEY,
           language: formattedLanguage,
           append_to_response: "videos,images",
         });

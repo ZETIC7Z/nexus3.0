@@ -1,6 +1,5 @@
 import slugify from "slugify";
 
-import { conf } from "@/setup/config";
 import { useLanguageStore } from "@/stores/language";
 import { usePreferencesStore } from "@/stores/preferences";
 import { SimpleCache } from "@/utils/common/cache";
@@ -10,10 +9,6 @@ import { getProxyUrls } from "@/utils/hosting/proxyUrls";
 
 import { MWMediaMeta, MWMediaType, MWSeasonMeta } from "./types/mw";
 import { getImdbEpisodes } from "./imdbMetadataProvider";
-import {
-  fetchValleyFallback,
-  resolveValleyFallbackTarget,
-} from "./valleyFallback";
 import {
   ExternalIdMovieSearchResult,
   TMDBContentTypes,
@@ -34,7 +29,7 @@ import {
   TMDBVideo,
   TMDBVideosResponse,
 } from "./types/tmdb";
-import { mwFetch, proxiedFetch } from "../helpers/fetch";
+import { mwFetch } from "../helpers/fetch";
 
 export function mediaTypeToTMDB(type: MWMediaType): TMDBContentTypes {
   if (type === MWMediaType.MOVIE) return TMDBContentTypes.MOVIE;
@@ -175,14 +170,6 @@ export function decodeTMDBId(
   };
 }
 
-const tmdbBaseUrl1 = "https://api.themoviedb.org/3/";
-const tmdbBaseUrl2 = "https://api.tmdb.org/3/";
-
-// v4 read tokens are JWTs (3 dot-separated base64 segments), v3 keys are short alphanumeric strings
-function isV4Token(key: string): boolean {
-  return key.split(".").length === 3;
-}
-
 // Cache for TMDB API responses
 interface TMDBCacheKey {
   url: string;
@@ -207,33 +194,6 @@ function abortOnTimeout(timeout: number): AbortSignal {
 }
 
 
-async function raceWithValleyFallback<T>(
-  primary: Promise<T>,
-  target: Parameters<typeof fetchValleyFallback>[0],
-): Promise<T> {
-  const primaryOutcome = primary.then(
-    (value) => ({ ok: true as const, value }),
-    (error) => ({ ok: false as const, error }),
-  );
-
-  const timeout = new Promise<"timeout">((resolve) => {
-    setTimeout(() => resolve("timeout"), 5000);
-  });
-
-  const first = await Promise.race([primaryOutcome, timeout]);
-  if (first !== "timeout" && first.ok) {
-    return first.value;
-  }
-
-  try {
-    return await fetchValleyFallback<T>(target);
-  } catch (valleyErr) {
-    const outcome = await primaryOutcome;
-    if (outcome.ok) return outcome.value;
-    throw outcome.error;
-  }
-}
-
 let proxyRotationIndex = 0;
 
 function getNextProxy(proxyUrls: string[]): string | undefined {
@@ -244,116 +204,24 @@ function getNextProxy(proxyUrls: string[]): string | undefined {
 }
 
 export async function get<T>(url: string, params?: object): Promise<T> {
-  const proxyUrls = getProxyUrls();
-  const proxy = getNextProxy(proxyUrls);
-  const shouldProxyTmdb = usePreferencesStore.getState().proxyTmdb;
   const userLanguage = useLanguageStore.getState().language;
   const formattedLanguage = getTmdbLanguageCode(userLanguage);
 
-  const apiKey = conf().TMDB_READ_API_KEY;
-  if (!apiKey) throw new Error("TMDB API key not set");
-
-  const tmdbHeaders: Record<string, string> = { accept: "application/json" };
-  if (isV4Token(apiKey)) {
-    tmdbHeaders.Authorization = `Bearer ${apiKey}`;
-  }
-
-  // Check cache first
-  const cacheKey: TMDBCacheKey = {
-    url,
-    params: params || {},
-    language: formattedLanguage,
-  };
-
+  const cacheKey: TMDBCacheKey = { url, params: params || {}, language: formattedLanguage };
   const cachedResult = tmdbCache.get(cacheKey);
-  if (cachedResult) {
-    return cachedResult as T;
-  }
+  if (cachedResult) return cachedResult as T;
 
-  // directly writing parameters, otherwise it will start the first parameter in the proxied request as "&" instead of "?" because it doesnt understand its proxied
-  const fullUrl = new URL(tmdbBaseUrl1 + url);
-  const allParams = {
-    ...params,
-    language: formattedLanguage,
-    ...(!isV4Token(apiKey) ? { api_key: apiKey } : {}),
-  };
+  // TMDB credentials are injected by /api/tmdb on the server. Keeping this
+  // request same-origin prevents the token from entering the client bundle,
+  // browser network requests, or third-party proxy URLs.
+  const allParams = { ...params, language: formattedLanguage };
+  const result = await mwFetch<T>(encodeURI(url), {
+    headers: { accept: "application/json" },
+    baseURL: "/api/tmdb/",
+    params: allParams,
+    signal: abortOnTimeout(10000),
+  });
 
-  if (allParams) {
-    Object.entries(allParams).forEach(([key, value]) => {
-      fullUrl.searchParams.append(key, String(value));
-    });
-  }
-
-  let result: T;
-
-  if (proxy && shouldProxyTmdb) {
-    try {
-      result = await mwFetch<T>(
-        `/?destination=${encodeURIComponent(fullUrl.toString())}`,
-        {
-          headers: tmdbHeaders,
-          baseURL: proxy,
-          signal: abortOnTimeout(5000),
-        },
-      );
-    } catch (err) {
-      console.error(err);
-      // Fall through to try direct connection
-    }
-  }
-
-  if (!result!) {
-    const primaryAttempt = (async (): Promise<T> => {
-      // ── First: try Vite dev-server proxy (hides API key + host in network tab) ──
-      // Only use the proxy in development — in production Vercel serves index.html
-      // for unknown routes (200 OK with HTML), which silently bypasses the fallback.
-      if (import.meta.env.DEV) {
-        try {
-          return await mwFetch<T>(encodeURI(url), {
-            headers: tmdbHeaders,
-            baseURL: "/nexus-tmdb/3/",
-            params: allParams,
-            signal: abortOnTimeout(5000),
-          });
-        } catch {
-          /* fall through to direct/CORS-proxy chain */
-        }
-      }
-
-      // ── Fallback: direct or CORS proxy (production / extension users) ──
-      try {
-        return await mwFetch<T>(encodeURI(url), {
-          headers: tmdbHeaders,
-          baseURL: tmdbBaseUrl1,
-          params: allParams,
-          signal: abortOnTimeout(5000),
-        });
-      } catch (err) {
-        try {
-          return await mwFetch<T>(encodeURI(url), {
-            headers: tmdbHeaders,
-            baseURL: tmdbBaseUrl2,
-            params: allParams,
-            signal: abortOnTimeout(5000),
-          });
-        } catch (err2) {
-          return await proxiedFetch<T>(encodeURI(url), {
-            headers: tmdbHeaders,
-            baseURL: tmdbBaseUrl1,
-            params: allParams,
-            signal: abortOnTimeout(10000),
-          });
-        }
-      }
-    })();
-
-    const valleyTarget = resolveValleyFallbackTarget(url);
-    result = valleyTarget
-      ? await raceWithValleyFallback(primaryAttempt, valleyTarget)
-      : await primaryAttempt;
-  }
-
-  // Cache the result for 1 hour (3600 seconds)
   tmdbCache.set(cacheKey, result, 3600);
   return result;
 }

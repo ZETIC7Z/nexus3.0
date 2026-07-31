@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import { get } from "@/backend/metadata/tmdb";
 import { Movie } from "@/pages/discover/common";
-import { conf } from "@/setup/config";
 import { useLanguageStore } from "@/stores/language";
 import { getTmdbLanguageCode } from "@/utils/locale/language";
 import { detectUserLanguage, detectUserRegion } from "@/utils/locale/userRegion";
@@ -27,7 +26,6 @@ export function RandomMovieButton() {
     const fetchMovies = async () => {
       try {
         const data = await get<TMDBMovieResponse>("/discover/movie", {
-          api_key: conf().TMDB_READ_API_KEY,
           language: formattedLanguage,
           region: detectUserRegion(),
           sort_by: "popularity.desc",

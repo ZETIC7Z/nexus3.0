@@ -20,8 +20,10 @@ export function createM3U8ProxyUrl(
   }
 
   const encodedUrl = encodeURIComponent(url);
-  const encodedHeaders = encodeURIComponent(JSON.stringify(headers));
-  return `${proxyBaseUrl}/m3u8-proxy?url=${encodedUrl}${headers ? `&headers=${encodedHeaders}` : ""}`;
+  const headerPart = Object.keys(headers).length > 0
+    ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
+    : "";
+  return `${proxyBaseUrl}/m3u8-proxy?url=${encodedUrl}${headerPart}`;
 }
 
 /**

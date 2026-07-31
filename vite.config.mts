@@ -46,6 +46,9 @@ const captioningPackages = [
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
+  const serverEnv = loadEnv(mode, process.cwd(), "");
+  const movieBoxTarget = serverEnv.MOVIEBOX_API_URL || "http://45.130.165.139:8000";
+  const movieBoxSecret = serverEnv.MOVIEBOX_API_SECRET || "";
   return {
     base: env.VITE_BASE_URL || "/",
     define: {
@@ -204,45 +207,33 @@ export default defineConfig(({ mode }) => {
 
     server: {
       proxy: {
-        // ── MovieBox VPS (existing) ───────────────────────────────────────
-        "/moviebox-api": {
-          target: "http://45.130.165.139:8000",
+        // ── MovieBox server-side compatibility route ──────────────────────
+        "/api/moviebox": {
+          target: movieBoxTarget,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/moviebox-api/, ""),
+          rewrite: (requestPath) => requestPath.replace(/^\/api\/moviebox/, ""),
+          headers: movieBoxSecret ? { "X-NEXUS-SECRET": movieBoxSecret } : {},
         },
-        // ── TMDB — metadata (security: hides real TMDB key + host) ───────
-        "/nexus-tmdb": {
+        // ── TMDB — metadata (server-side key, same-origin browser request) ─
+        "/api/tmdb": {
           target: "https://api.themoviedb.org",
           changeOrigin: true,
           secure: true,
-          rewrite: (path) => path.replace(/^\/nexus-tmdb/, ""),
-        },
-        // ── Zunime / Anivexa API (Vercel deployment) ─────────────────────
-        "/nexus-zunime": {
-          target: "https://zetianime-api.vercel.app",
-          changeOrigin: true,
-          secure: true,
-          rewrite: (path) => path.replace(/^\/nexus-zunime/, ""),
-        },
-        // ── Zunime / Anivexa API (Cloudflare Worker fallback) ────────────
-        "/nexus-zunime-worker": {
-          target: "https://zetianime-api.samxerz-zeticuz.workers.dev",
-          changeOrigin: true,
-          secure: true,
-          rewrite: (path) => path.replace(/^\/nexus-zunime-worker/, ""),
-        },
-        // ── AniList GraphQL (hides AniList origin) ───────────────────────
-        "/nexus-anilist": {
-          target: "https://graphql.anilist.co",
-          changeOrigin: true,
-          secure: true,
-          rewrite: (path) => path.replace(/^\/nexus-anilist/, ""),
-        },
-        // ── VidSrc VPS Scraper (runs on :4001) ─────────────
-        "/nexus-vidsrc": {
-          target: "http://45.130.165.139:4001",
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/nexus-vidsrc/, ""),
+          rewrite: (requestPath) => {
+            const rewritten = requestPath.replace(/^\/api\/tmdb/, "/3");
+            const token = serverEnv.TMDB_READ_API_KEY || serverEnv.VITE_TMDB_READ_API_KEY;
+            // TMDB v4 tokens use Authorization; legacy v3 keys must be added
+            // server-side to the proxied request and never come from the client.
+            if (!token || token.split(".").length === 3) return rewritten;
+            const separator = rewritten.includes("?") ? "&" : "?";
+            return `${rewritten}${separator}api_key=${encodeURIComponent(token)}`;
+          },
+          headers: (() => {
+            const token = serverEnv.TMDB_READ_API_KEY || serverEnv.VITE_TMDB_READ_API_KEY;
+            return token?.split(".").length === 3
+              ? { Authorization: `Bearer ${token}` }
+              : {};
+          })(),
         },
       },
     },
@@ -250,6 +241,8 @@ export default defineConfig(({ mode }) => {
 
     test: {
       environment: "jsdom",
+      exclude: ["tests/**", "node_modules/**"],
+      passWithNoTests: true,
     },
     preview: {
       host: true,

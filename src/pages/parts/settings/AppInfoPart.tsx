@@ -53,14 +53,14 @@ export function AppInfoPart() {
           <p className="text-white">{hostname}</p>
         </div>
 
-        {/* Backend URL */}
+        {/* Backend connection (the URL itself is intentionally not rendered) */}
         <div className="col-span-2 space-y-1">
           <div className="text-type-dimmed font-medium flex items-center">
             <p>{t("settings.sidebar.info.backendUrl")}</p>
             <SecureBadge url={backendUrl} />
           </div>
           <p className="text-white">
-            {backendUrl?.replace(/https?:\/\//, "") ?? "—"}
+            {backendUrl ? "Configured (hidden)" : "—"}
           </p>
         </div>
 

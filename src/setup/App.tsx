@@ -27,9 +27,7 @@ import { useGlobalKeyboardEvents } from "@/hooks/useGlobalKeyboardEvents";
 import { useOnlineListener } from "@/hooks/usePing";
 import { useNotificationInit } from "@/hooks/useNotifications";
 import { AboutPage } from "@/pages/About";
-import { AdminPage } from "@/pages/admin/AdminPage";
 import { AllBookmarks } from "@/pages/bookmarks/AllBookmarks";
-import VideoTesterView from "@/pages/developer/VideoTesterView";
 import { DiscoverMore } from "@/pages/discover/AllMovieLists";
 import { Discover } from "@/pages/discover/Discover";
 import { MoreContent } from "@/pages/discover/MoreContent";
@@ -57,8 +55,10 @@ import { useClearModalsOnNavigation } from "@/stores/interface/overlayStack";
 import { LanguageProvider } from "@/stores/language";
 import { conf } from "@/setup/config";
 
+const AdminPage = lazy(() => import("@/pages/admin/AdminPage").then((module) => ({ default: module.AdminPage })));
 const DeveloperPage = lazy(() => import("@/pages/DeveloperPage"));
 const TestView = lazy(() => import("@/pages/developer/TestView"));
+const VideoTesterView = lazy(() => import("@/pages/developer/VideoTesterView"));
 const PlayerView = lazyWithPreload(() => import("@/pages/PlayerView"));
 const SettingsPage = lazyWithPreload(() => import("@/pages/Settings"));
 
@@ -298,14 +298,43 @@ function App() {
               </Suspense>
             }
           />
-          {/* admin routes */}
-          <Route path="/admin" element={<AdminPage />} />
-          {/* other */}
-          <Route path="/dev" element={<DeveloperPage />} />
-          <Route path="/dev/video" element={<VideoTesterView />} />
-          {/* developer routes that can abuse workers are disabled in production */}
-          {process.env.NODE_ENV === "development" ? (
-            <Route path="/dev/test" element={<TestView />} />
+          {/* Diagnostic/admin tools are development-only. They expose powerful
+              stream testing controls and infrastructure metadata. */}
+          {import.meta.env.DEV ? (
+            <>
+              <Route
+                path="/admin"
+                element={
+                  <Suspense fallback={null}>
+                    <AdminPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/dev"
+                element={
+                  <Suspense fallback={null}>
+                    <DeveloperPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/dev/video"
+                element={
+                  <Suspense fallback={null}>
+                    <VideoTesterView />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/dev/test"
+                element={
+                  <Suspense fallback={null}>
+                    <TestView />
+                  </Suspense>
+                }
+              />
+            </>
           ) : null}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

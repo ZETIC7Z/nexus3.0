@@ -31,3 +31,4 @@ package-lock.json
 sync-fork.bat
 
 .vercel
+.env*

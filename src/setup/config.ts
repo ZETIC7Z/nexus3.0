@@ -14,7 +14,6 @@ interface Config {
   DMCA_EMAIL: string;
   TELEGRAM_LINK: string;
   TWITTER_LINK: string;
-  TMDB_READ_API_KEY: string;
   CORS_PROXY_URL: string;
   M3U8_PROXY_URL: string;
   NORMAL_ROUTER: boolean;
@@ -72,7 +71,6 @@ export interface RuntimeConfig {
   DMCA_EMAIL: string | null;
   TELEGRAM_LINK: string;
   TWITTER_LINK: string;
-  TMDB_READ_API_KEY: string | null;
   ALLOW_DEBRID_KEY: boolean;
   NORMAL_ROUTER: boolean;
   PROXY_URLS: string[];
@@ -125,7 +123,6 @@ export interface RuntimeConfig {
 }
 
 const env: Record<keyof Config, undefined | string> = {
-  TMDB_READ_API_KEY: import.meta.env.VITE_TMDB_READ_API_KEY,
   APP_VERSION: undefined,
   GITHUB_LINK: undefined,
   DISCORD_LINK: undefined,
@@ -239,7 +236,6 @@ export function conf(): RuntimeConfig {
       }
       return backendUrlValue;
     })(),
-    TMDB_READ_API_KEY: getKey("TMDB_READ_API_KEY"),
     PROXY_URLS: getKey("CORS_PROXY_URL", "")
       .split(",")
       .map((v) => v.trim())

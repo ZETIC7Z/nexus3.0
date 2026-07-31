@@ -58,7 +58,7 @@ export function M3U8ProxyItem(props: {
       <div className="flex-1">
         <p className="text-white font-bold">{props.name}</p>
         {props.errorText ? <p>{props.errorText}</p> : null}
-        {urlWithoutProtocol ? <p>{urlWithoutProtocol}</p> : null}{" "}
+        {urlWithoutProtocol ? <p>Proxy endpoint hidden</p> : null}{" "}
       </div>
     </div>
   );
