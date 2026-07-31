@@ -212,7 +212,7 @@ export function KeyboardCommandsEditModal({
   );
 
   const [editingShortcuts, setEditingShortcuts] =
-    useState<KeyboardShortcuts>(keyboardShortcuts);
+    useState<KeyboardShortcuts>(keyboardShortcuts ?? DEFAULT_KEYBOARD_SHORTCUTS);
   const [editingId, setEditingId] = useState<ShortcutId | null>(null);
   const [editingModifier, setEditingModifier] = useState<KeyboardModifier | "">(
     "",

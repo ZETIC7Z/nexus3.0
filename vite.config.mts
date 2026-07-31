@@ -206,7 +206,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // ── MovieBox VPS (existing) ───────────────────────────────────────
         "/moviebox-api": {
-          target: "http://152.42.223.175:8000",
+          target: "http://45.130.165.139:8000",
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/moviebox-api/, ""),
         },
@@ -240,7 +240,7 @@ export default defineConfig(({ mode }) => {
         },
         // ── VidSrc VPS Scraper (runs on :4001) ─────────────
         "/nexus-vidsrc": {
-          target: "http://152.42.223.175:4001",
+          target: "http://45.130.165.139:4001",
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/nexus-vidsrc/, ""),
         },
