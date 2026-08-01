@@ -1,32 +1,22 @@
 // api/vidfast2-stream.js
-// Vercel serverless function — proxies VidFast2 playback stream content.
+// Vercel serverless function — transparent proxy for VidFast2 M3U8/TS playback.
 // Forwards to the configured M3U8 proxy with VidFast referer/origin headers.
 
 const M3U8_PROXY = process.env.VITE_M3U8_PROXY_URL || "https://pstream.dovetechnology.org";
 
-function getPath(query) {
-  const value = query ? query.path : undefined;
-  if (!value) return "";
-  const parts = Array.isArray(value) ? value : [value];
-  return parts.map(p => String(p).replace(/^\/+|\\/+$/g, "")).filter(Boolean).join("/");
-}
-
 export default async function handler(req, res) {
-  const method = (req.method ?? "GET").toUpperCase();
-  const query = req.query || {};
-  const path = getPath(query);
+  const path = (req.query?.path || "").replace(/^\/+|\/+$/g, "");
+  if (!path) { res.status(400).send("Missing path"); return; }
 
-  if (!path) { res.status(404).send("Not found"); return; }
-
+  // Rebuild upstream URL — forward ALL query params except "path"
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (key === "path") continue;
-    for (const item of Array.isArray(value) ? value : [value]) {
-      params.append(key, item);
-    }
+  for (const [k, v] of Object.entries(req.query || {})) {
+    if (k === "path") continue;
+    for (const item of Array.isArray(v) ? v : [v]) params.append(k, item);
   }
+  const qs = params.toString();
+  const targetUrl = `${M3U8_PROXY}/${path}${qs ? "?" + qs : ""}`;
 
-  const targetUrl = `${M3U8_PROXY}/${path}?${params.toString()}`;
   const headers = {
     Accept: "*/*",
     Referer: "https://vidfast.vc/",
@@ -35,14 +25,19 @@ export default async function handler(req, res) {
   };
 
   try {
-    const upstream = await fetch(targetUrl, { method, headers });
+    const upstream = await fetch(targetUrl, {
+      method: req.method || "GET",
+      headers,
+    });
+
     res.status(upstream.status);
     const ct = upstream.headers.get("content-type");
     if (ct) res.setHeader("Content-Type", ct);
     res.setHeader("Access-Control-Allow-Origin", "*");
-    if (method === "HEAD") { res.send(""); return; }
+
+    if (req.method === "HEAD") { res.send(""); return; }
     res.send(await upstream.text());
   } catch (e) {
-    res.status(502).send(e.message || "VidFast2 stream upstream unavailable");
+    res.status(502).send(e.message || "Upstream unavailable");
   }
 }
