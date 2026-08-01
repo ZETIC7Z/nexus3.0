@@ -20,12 +20,33 @@
 
 import { flags, labelToLanguageCode } from "@nexus/providers";
 import { makeProviderContext } from "./makeProviderContext";
+import { getProxiedUrl } from "./proxiedFetch";
 import { ScrapeContext } from "./types";
 
-// Same-origin proxy paths — Vite server handles the proxying, no CORS
+// Worker & stream proxies always use same-origin routes (work on both Vite dev and Vercel).
 const WORKER_PROXY = "/api/vidfast2-worker";
-const VIDFAST_PROXY = "/api/vidfast2-vc";
 const STREAM_PROXY = "/api/vidfast2-stream";
+
+// VC calls need browser-emulation headers. In dev, Vite proxy injects them.
+// In production (Vercel), Cloudflare blocks datacenter IPs so we can't proxy
+// VC calls through Vercel functions. Instead, route them through the user's
+// configured CORS proxy which uses residential IPs.
+const VIDFAST_VC_BASE = "https://vidfast.vc";
+const VC_HEADERS: Record<string, string> = {
+  "Accept": "*/*",
+  "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+  "Referer": "https://vidfast.vc/",
+  "X-Requested-With": "XMLHttpRequest",
+};
+
+function vcUrl(path: string): string {
+  if (import.meta.env.DEV) {
+    // Vite proxy injects VC_HEADERS server-side.
+    return `/api/vidfast2-vc${path}`;
+  }
+  // Production: route through the CORS proxy to bypass Cloudflare.
+  return getProxiedUrl(`${VIDFAST_VC_BASE}${path}`);
+}
 
 function makeStreamProxyUrl(url: string, kind: "m3u8-proxy" | "ts-proxy"): string {
   const params = new URLSearchParams({ url });
@@ -133,13 +154,11 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
     pagePath = `/movie/${tmdbId}`;
   }
   const pageRes = await req(
-    `${VIDFAST_PROXY}${pagePath}`,
+    vcUrl(pagePath),
     {
-      headers: {
-        Accept: "*/*",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-      },
+      headers: import.meta.env.DEV
+        ? { Accept: "*/*", "Cache-Control": "no-cache", Pragma: "no-cache" }
+        : { ...VC_HEADERS },
     },
     15000,
     2,
@@ -166,8 +185,9 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const payload = gen.payload;
 
   // 4. Get encrypted servers from vidfast.vc (Vite proxy injects Referer/UA/X-Requested-With)
-  const serversRes = await req(`${VIDFAST_PROXY}/${staticPath}/${serverPath}/${payload}`, {
+  const serversRes = await req(vcUrl(`/${staticPath}/${serverPath}/${payload}`), {
     method: "POST",
+    headers: import.meta.env.DEV ? {} : { ...VC_HEADERS },
   });
   if (!serversRes.ok) throw new Error(`VidFast2: servers HTTP ${serversRes.status}`);
   const encServers = await serversRes.text();
@@ -183,8 +203,9 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
 
   // 6. Get encrypted stream (Vite proxy injects Referer/UA/X-Requested-With)
   const best = servers.find((s) => s.name === "vRapid") || servers[0];
-  const streamRes = await req(`${VIDFAST_PROXY}/${staticPath}/${streamPath}/${best.data}`, {
+  const streamRes = await req(vcUrl(`/${staticPath}/${streamPath}/${best.data}`), {
     method: "POST",
+    headers: import.meta.env.DEV ? {} : { ...VC_HEADERS },
   });
   if (!streamRes.ok) throw new Error(`VidFast2: stream HTTP ${streamRes.status}`);
   const encStream = await streamRes.text();
