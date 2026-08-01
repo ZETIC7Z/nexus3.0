@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   // Inject required browser-emulation headers
   const headers = {
     Accept: "*/*",
-    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
     Referer: "https://vidfast.vc/",
     "X-Requested-With": "XMLHttpRequest",
   };
