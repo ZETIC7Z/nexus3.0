@@ -241,7 +241,7 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
 export const vidfast2Provider = makeProviderContext({
   id: "nexus-vidfast2",
   name: "Zephyr 🔥",
-  rank: 1295,
+  rank: 1310,
   disabled: false,
   async scrape(ctx) {
     try { return await scrapeVidFast2(ctx); }
