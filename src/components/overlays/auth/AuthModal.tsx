@@ -86,6 +86,8 @@ export function AuthModal({ id }: { id: string }) {
   const metaResult = useAsync(async () => {
     const targetUrl = backendUrl || config.BACKEND_URL;
     if (!targetUrl) return null;
+    // Skip known-unreachable legacy backends to avoid CORS noise
+    if (targetUrl.includes("court.fontaine.lol") || targetUrl.includes("natsuki.fontaine.lol")) return null;
     return getBackendMeta(targetUrl);
   }, [backendUrl, config.BACKEND_URL]);
 

@@ -21,7 +21,7 @@ export async function scrapeVdrkCaptions(
       url = `https://sub.vdrk.site/v1/movie/${tmdbIdNum}`;
     }
 
-    console.log("Searching VDRK subtitles with URL:", url);
+    // console.debug("Searching VDRK subtitles with URL:", url);
 
     const response = await fetch(url);
 
@@ -66,7 +66,7 @@ export async function scrapeVdrkCaptions(
       }
     }
 
-    console.log(`Found ${vdrkCaptions.length} VDRK subtitles`);
+    // console.debug(`Found ${vdrkCaptions.length} VDRK subtitles`);
     return vdrkCaptions;
   } catch (error) {
     console.error("Error fetching VDRK subtitles:", error);

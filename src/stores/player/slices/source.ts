@@ -461,7 +461,7 @@ export const createSourceSlice: MakeSlice<SourceSlice> = (set, get) => ({
         });
         console.log(`Added ${externalCaptions.length} external captions`);
 
-        // Auto-select and ALWAYS ENABLE subtitle (Natsuki → OpenSubtitles → Wyzie → Vdrk)
+        // Auto-select and ALWAYS ENABLE subtitle (OpenSubtitles → Wyzie → Vdrk)
         const { useSubtitleStore } = await import("@/stores/subtitles");
         const subtitleState = useSubtitleStore.getState();
         const currentStore = get();
