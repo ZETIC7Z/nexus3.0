@@ -9,6 +9,7 @@
 //   → { success, streams: [{ name, title, url, quality, headers? }] }
 //
 // VPS: 168.107.87.42 (Oracle Cloud VM.Standard.E2.1.Micro, Singapore)
+// Also hosts MovieBox (port 8000) — see MOVIEBOX_API_URL in Vercel env vars.
 // Working providers (tested live 2026-08-01):
 //   vidfast   — vidfast.vc (movie+TV)
 //   notorrent — Stremio addon, 8-11 streams (movie+TV)
