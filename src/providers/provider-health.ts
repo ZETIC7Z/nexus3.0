@@ -30,8 +30,6 @@ function probeUrlFor(id: string): string | null {
     case "nexus-anikai":
     case "nexus-anikoto":
       return `${hf}/api/streams/${id.replace("nexus-", "")}/series/37854?season=1&episode=1`;
-    case "nexus-felisplus":
-      return null;
     default:
       return null;
   }

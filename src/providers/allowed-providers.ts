@@ -2,8 +2,6 @@
 // NEXUS — Per-Media Allowed Provider Registry
 // ---------------------------------------------------------------------------
 // Movies / TV shows :  VidFast → NoTorrent → VidUp → MovieBox
-// VidLink and VidSrc are intentionally removed from the active list.
-// FelisPlus is held back until the live HF Space exposes its route.
 // Anime              :  AniKai → AniKoto → MovieBox
 // ---------------------------------------------------------------------------
 

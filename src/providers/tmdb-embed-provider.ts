@@ -8,8 +8,10 @@
 //   GET /api/streams/:provider/movie|series/:tmdbId?...
 //   → { success, streams: [{ name, title, url, quality, headers? }] }
 //
-// Working providers (tested live 2026-07-31):
+// Working providers (tested live 2026-08-01):
+//   vidfast   — vidfast.vc (movie+TV)
 //   notorrent — Stremio addon, 8-11 streams (movie+TV)
+//   vidup     — vidup.to (movie+TV)
 //   anikai    — anikai.watch scraper (anime only)
 //   anikoto   — anikototv.to via Vercel API (anime only, dub support)
 // ---------------------------------------------------------------------------
@@ -254,12 +256,9 @@ function makeEmbedProvider(
 }
 
 // Movie / TV providers — each shown separately in the source list
-export const notorrentProvider = makeEmbedProvider("nexus-notorrent", "NoTorrent 🧲", 1280, "notorrent");
 export const vidfastProvider   = makeEmbedProvider("nexus-vidfast",   "VidFast ⚡",   1290, "vidfast");
+export const notorrentProvider = makeEmbedProvider("nexus-notorrent", "NoTorrent 🧲", 1280, "notorrent");
 export const vidupProvider     = makeEmbedProvider("nexus-vidup",     "VidUp 📤",     1252, "vidup");
-// Kept ready for the HF backend, but disabled until its route is deployed.
-// The live Space currently returns PROVIDER_NOT_FOUND for /felisplus.
-export const felisplusProvider  = makeEmbedProvider("nexus-felisplus", "FelisPlus 🐱", 1255, "felisplus", true);
 
 // Anime providers (keep existing dub support via isDubStream check)
 export const anikaiProvider  = makeEmbedProvider("nexus-anikai",  "AniKai 🀄",  1250, "anikai");
