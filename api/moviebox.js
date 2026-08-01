@@ -98,12 +98,21 @@ export default async function handler(req, res) {
   }
 
   let mediaUrl = null;
+  // Reconstruct full URL including query params that may have been split
+  // by Vercel's query parser (e.g. ?url=...mp4?sign=X&t=Y → url=...mp4?sign=X, t=Y).
   if (path === "api/proxy") {
     const hosts = allowedMediaHosts();
-    mediaUrl = validateMediaUrl(
-      Array.isArray(req.query.url) ? req.query.url[0] : req.query.url,
-      hosts,
-    );
+    const rawUrl = Array.isArray(req.query.url) ? req.query.url[0] : req.query.url;
+    // Append any extra query params (split off by Vercel) back to the URL.
+    const extra = new URLSearchParams();
+    for (const [k, v] of Object.entries(req.query)) {
+      if (k === "path" || k === "url") continue;
+      for (const item of Array.isArray(v) ? v : [v]) {
+        extra.append(k, item);
+      }
+    }
+    const fullUrl = rawUrl && extra.toString() ? `${rawUrl}&${extra}` : rawUrl;
+    mediaUrl = validateMediaUrl(fullUrl, hosts);
     if (!mediaUrl) {
       res.status(403).send("Media host is not allowed");
       return;
@@ -122,6 +131,12 @@ export default async function handler(req, res) {
   if (path !== "api/proxy") {
     const secret = process.env.MOVIEBOX_API_SECRET;
     if (secret) headers["X-NEXUS-SECRET"] = secret;
+  } else {
+    // Media CDN requires specific headers to serve content.
+    // Without these, bcdnxw.hakunaymatata.com returns 403.
+    headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
+    headers.Referer = "https://netfilm.world/";
+    headers.Origin = "https://netfilm.world";
   }
 
   try {

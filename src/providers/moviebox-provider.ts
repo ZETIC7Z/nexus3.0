@@ -26,14 +26,13 @@ import { getLoadbalancedProxyUrl } from "@/backend/providers/fetchers";
 // ── Config (base URL comes from .env → VITE_MOVIEBOX_API_URL) ───────────────
 // MovieBox requests always use the same-origin route. The Vercel function
 // (and Vite dev proxy) injects the upstream URL and secret server-side.
-const MOVIEBOX_BASE = "/api/moviebox";
-
-const TIMEOUT = 15000;
+const MOVIEBOX_BASE = "/api/moviebox";const TIMEOUT = 8000;
+const STREAM_TIMEOUT = 15000;
 
 // ── HTTP helpers ────────────────────────────────────────────────────────────
-async function getJson<T>(url: string): Promise<T> {
+async function getJson<T>(url: string, timeoutMs?: number): Promise<T> {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), TIMEOUT);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs ?? TIMEOUT);
   
   let targetUrl = url;
   const headers: Record<string, string> = {
@@ -269,6 +268,7 @@ async function fetchStreamsForLang(
   });
   return getJson<MovieBoxStreamResponse>(
     `${MOVIEBOX_BASE}/api/stream/${encodeURIComponent(subjectId)}?${params.toString()}`,
+    STREAM_TIMEOUT,
   );
 }
 
@@ -287,19 +287,42 @@ function normalizeQuality(q?: string): string {
 // ── Main scrape ──────────────────────────────────────────────────────────────
 export async function scrapeMovieBox(ctx: ScrapeContext) {
   const { media } = ctx;
+
+  // 1. Search MovieBox by title + concurrently check if show is anime via TMDB
   const isShow = media.type === "show";
   const isMovie = media.type === "movie";
   const season = isShow ? media.season.number : 0;
   const episode = isShow ? media.episode.number : 0;
 
-  // Custom suffix parsing for anime absolute episode mappings (e.g. tmdb-tv-37854-one-piece-ZE)
   const cleanTitle = media.title.replace(/-ZE$/i, "").trim();
   const hasZeSuffix = media.title.endsWith("-ZE") || media.title.endsWith("-ze") || !!(media as any).customEpisode;
 
-  // 1. Search MovieBox by title
-  const search = await getJson<MovieBoxSearchResult>(
+  // Fire search and anime-detection concurrently to save ~300ms
+  const searchPromise = getJson<MovieBoxSearchResult>(
     `${MOVIEBOX_BASE}/search?q=${encodeURIComponent(cleanTitle)}`,
   );
+
+  let animeCheckPromise: Promise<void> | null = null;
+  let preDetectedAnime = false;
+  if (isShow && !hasZeSuffix) {
+    animeCheckPromise = (async () => {
+      try {
+        const resp = await fetch(`/api/tmdb/tv/${media.tmdbId}`, {
+          headers: { Accept: "application/json" },
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const genres = data.genres ?? [];
+          const originCountry = data.origin_country ?? [];
+          const isAnimation = genres.some((g: any) => g.id === 16);
+          const isJapanese = originCountry.includes("JP");
+          if (isAnimation && isJapanese) preDetectedAnime = true;
+        }
+      } catch { /* best-effort, fall through */ }
+    })();
+  }
+
+  const search = await searchPromise;
   const movies = search.items ?? search.movies ?? [];
   if (!movies.length) {
     throw new Error(`MovieBox: no search results for "${cleanTitle}"`);
@@ -325,32 +348,12 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
 
   const dubs: Array<{ lanName: string; subjectId: string; detailPath: string; lanCode?: string; original?: boolean }> = (subject as any).dubs ?? [];
 
-  // Determine if this is an anime show
-  let isAnime = false;
+  // Resolve anime detection (awaited here if the concurrent check was kicked off)
+  if (animeCheckPromise) await animeCheckPromise;
+  let isAnime = hasZeSuffix || preDetectedAnime;
   const badge = match.badge ?? (subject as any).badge;
-  if (badge?.toLowerCase() === "anime" || hasZeSuffix) {
+  if (badge?.toLowerCase() === "anime") {
     isAnime = true;
-  }
-  if (!isAnime && isShow) {
-    try {
-      const response = await fetch(`/api/tmdb/tv/${media.tmdbId}`, {
-        headers: {
-          Accept: "application/json",
-        },
-      });
-      if (response.ok) {
-          const data = await response.json();
-          const genres = data.genres ?? [];
-          const originCountry = data.origin_country ?? [];
-          const isAnimation = genres.some((g: any) => g.id === 16);
-          const isJapanese = originCountry.includes("JP");
-          if (isAnimation && isJapanese) {
-            isAnime = true;
-          }
-      }
-    } catch (e) {
-      console.error("Failed to check if show is anime from TMDB:", e);
-    }
   }
 
 
@@ -378,8 +381,8 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
   // 4. Fetch the primary stream
   const primary = await fetchStreamsForLang(subjectId, match.slug, querySeason, queryEpisode);
 
-  // 5. MovieBox is intentionally MP4-only. HLS and DASH responses are
-  // ignored because MovieBox uses muxed MP4 files for language variants.
+  // 5. MovieBox is intentionally MP4-only. Return the fastest source first.
+  // Sources are sorted by resolution (highest first) but all are valid.
   const mp4Sources = (primary.sources ?? []).filter(
     (s: any) => s.format?.toLowerCase() === "mp4" && typeof s.url === "string" && s.url.trim().length > 0,
   );
@@ -490,7 +493,7 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
 export const movieboxProvider = makeProviderContext({
   id: "nexus-moviebox",
   name: "MovieBox 🔥",
-  rank: 1000,
+  rank: 1300,
   disabled: false,
   async scrape(ctx) {
     try {

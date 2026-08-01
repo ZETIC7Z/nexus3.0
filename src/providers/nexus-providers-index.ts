@@ -17,12 +17,12 @@ import { getHealthyProviders, type ProbeableProvider } from "./provider-health";
 
 // Ordered by rank (highest first).
 export const nexusCustomProviders = [
+  movieboxProvider,      // 1300 — MovieBox (self-hosted VPS, MP4 + multi-audio dubs, fastest)
   vidfastProvider,       // 1290 — VidFast (vidfast.vc, movie+TV)
   notorrentProvider,     // 1280 — NoTorrent (Stremio addon, movie+TV, 8-11 streams)
   vidupProvider,         // 1252 — VidUp (vidup.to, movie+TV)
   anikaiProvider,        // 1250 — AniKai (anime, via TMDB-Embed API)
   anikotoProvider,       // 1240 — AniKoto (anime, via TMDB-Embed API, dub support)
-  movieboxProvider,      // 1000 — MovieBox (self-hosted VPS, MP4 + multi-audio dubs)
 ] as const;
 
 export const nexusCustomEmbeds = [] as const;
