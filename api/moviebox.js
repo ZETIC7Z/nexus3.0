@@ -111,7 +111,7 @@ export default async function handler(req, res) {
     query.set("url", mediaUrl);
   }
 
-  const headers: Record<string, string> = {};
+  const headers = {};
   // Only use JSON accept for API requests, not for media proxy fetches.
   if (path !== "api/proxy") {
     headers.Accept = getSingleHeader(req, "accept") ?? "application/json";
