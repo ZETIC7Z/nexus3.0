@@ -1,8 +1,8 @@
 // allowed-providers.ts
 // NEXUS — Per-Media Allowed Provider Registry
 // ---------------------------------------------------------------------------
-// Movies / TV shows :  VidFast → NoTorrent → VidUp → MovieBox
-// Anime              :  AniKai → AniKoto → MovieBox
+// Movies / TV shows :  MovieBox → VidFast → NoTorrent → VidUp
+// Anime              :  MovieBox → AniKai → AniKoto
 // ---------------------------------------------------------------------------
 
 const animeCache = new Map<string, boolean>();
@@ -66,11 +66,11 @@ export async function checkIsAnime(media: { tmdbId: string; type: "movie" | "sho
 
 export function getAllowedSourceIds(_mediaType: "movie" | "show", isAnime: boolean): string[] {
   return isAnime
-    ? ["nexus-anikai", "nexus-anikoto", "nexus-moviebox"]
+    ? ["nexus-moviebox", "nexus-anikai", "nexus-anikoto"]
     : [
+        "nexus-moviebox",
         "nexus-vidfast",
         "nexus-notorrent",
         "nexus-vidup",
-        "nexus-moviebox",
       ];
 }
