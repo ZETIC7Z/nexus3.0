@@ -25,17 +25,13 @@ export default async function handler(req, res) {
   };
 
   try {
-    const upstream = await fetch(targetUrl, {
-      method: req.method || "GET",
-      headers,
-    });
-
+    const method = (req.method || "GET").toUpperCase();
+    const upstream = await fetch(targetUrl, { method, headers });
     res.status(upstream.status);
     const ct = upstream.headers.get("content-type");
     if (ct) res.setHeader("Content-Type", ct);
     res.setHeader("Access-Control-Allow-Origin", "*");
-
-    if (req.method === "HEAD") { res.send(""); return; }
+    if (method === "HEAD") { res.send(""); return; }
     res.send(await upstream.text());
   } catch (e) {
     res.status(502).send(e.message || "Upstream unavailable");

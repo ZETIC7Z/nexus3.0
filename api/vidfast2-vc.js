@@ -24,9 +24,9 @@ export default async function handler(req, res) {
     Referer: "https://vidfast.vc/",
     "X-Requested-With": "XMLHttpRequest",
   };
-  if (req.headers["content-type"]) {
-    headers["Content-Type"] = Array.isArray(req.headers["content-type"])
-      ? req.headers["content-type"][0] : req.headers["content-type"];
+  const reqCt = req.headers && req.headers["content-type"];
+  if (reqCt) {
+    headers["Content-Type"] = Array.isArray(reqCt) ? reqCt[0] : reqCt;
   }
 
   try {
