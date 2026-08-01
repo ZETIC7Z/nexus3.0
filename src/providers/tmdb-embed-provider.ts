@@ -23,32 +23,38 @@ import { makeProviderContext } from "./makeProviderContext";
 import { getProxiedUrl } from "./proxiedFetch";
 import { ScrapeContext } from "./types";
 
-const TMDB_EMBED_BASE = import.meta.env.VITE_TMDB_EMBED_URL || "https://stycanine1-tmdb-embed-api.hf.space";
+const STABLE_TMDB_EMBED_BASE = "https://stycanine1-tmdb-embed-api.hf.space";
+const configuredTmdbEmbedBase = import.meta.env.VITE_TMDB_EMBED_URL?.replace(/\/$/, "");
+const TMDB_EMBED_BASES = [configuredTmdbEmbedBase, STABLE_TMDB_EMBED_BASE].filter(
+  (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
+);
 
 function toSameOriginEmbedUrl(url: string): string {
   return url;
 }
 
-const REQUEST_TIMEOUT = 30000;
+const REQUEST_TIMEOUT = 8000;
 
 // ---------------------------------------------------------------------------
 // HTTP helper
 // ---------------------------------------------------------------------------
-async function getJson<T>(url: string): Promise<T | null> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT);
-  try {
-    const res = await fetch(getProxiedUrl(url), {
-      signal: ctrl.signal,
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(t);
+async function getJson<T>(urls: string[]): Promise<T | null> {
+  for (const url of urls) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT);
+    try {
+      const res = await fetch(getProxiedUrl(url), {
+        signal: ctrl.signal,
+        headers: { Accept: "application/json" },
+      });
+      if (res.ok) return (await res.json()) as T;
+    } catch {
+      // Try the stable fallback backend before reporting a provider failure.
+    } finally {
+      clearTimeout(t);
+    }
   }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +111,7 @@ function dubLanguage(s: EmbedStreamItem): { label: string; language: string } {
 // ---------------------------------------------------------------------------
 // URL builder
 // ---------------------------------------------------------------------------
-function buildApiUrl(provider: string, ctx: ScrapeContext): string {
+function buildApiUrls(provider: string, ctx: ScrapeContext): string[] {
   const { media } = ctx;
   const type = media.type === "movie" ? "movie" : "series";
   const params = new URLSearchParams();
@@ -114,7 +120,8 @@ function buildApiUrl(provider: string, ctx: ScrapeContext): string {
     params.set("episode", String(media.episode.number));
   }
   if (media.imdbId) params.set("imdbId", media.imdbId);
-  return `${TMDB_EMBED_BASE}/api/streams/${provider}/${type}/${encodeURIComponent(media.tmdbId)}?${params.toString()}`;
+  const suffix = `/api/streams/${provider}/${type}/${encodeURIComponent(media.tmdbId)}?${params.toString()}`;
+  return TMDB_EMBED_BASES.map((base) => `${base}${suffix}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +142,7 @@ function normalizeQuality(q?: string): string {
 // Shared scrape logic — works for all individual providers
 // ---------------------------------------------------------------------------
 async function scrapeTmdbEmbed(ctx: ScrapeContext, provider: string, label: string) {
-  const data = await getJson<EmbedStreamResponse>(buildApiUrl(provider, ctx));
+  const data = await getJson<EmbedStreamResponse>(buildApiUrls(provider, ctx));
 
   if (!data?.success || !data.streams?.length) {
     throw new Error(`${label}: no sources (${data?.error ?? "empty response"}).`);
