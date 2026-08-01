@@ -111,11 +111,18 @@ export default async function handler(req, res) {
     query.set("url", mediaUrl);
   }
 
-  const headers = { Accept: getSingleHeader(req, "accept") ?? "application/json" };
+  const headers: Record<string, string> = {};
+  // Only use JSON accept for API requests, not for media proxy fetches.
+  if (path !== "api/proxy") {
+    headers.Accept = getSingleHeader(req, "accept") ?? "application/json";
+  }
   const range = getSingleHeader(req, "range");
   if (range) headers.Range = range;
-  const secret = process.env.MOVIEBOX_API_SECRET;
-  if (secret) headers["X-NEXUS-SECRET"] = secret;
+  // Secret is for the upstream MovieBox API, never for the media CDN.
+  if (path !== "api/proxy") {
+    const secret = process.env.MOVIEBOX_API_SECRET;
+    if (secret) headers["X-NEXUS-SECRET"] = secret;
+  }
 
   try {
     // Media URLs are validated against the allowlist above, then fetched
