@@ -1,13 +1,14 @@
 // tmdb-embed-provider.ts
-// NEXUS — Individual providers via the TMDB-Embed API (HuggingFace Space)
+// NEXUS — Individual providers via the TMDB-Embed API (Oracle Cloud VPS)
 // ---------------------------------------------------------------------------
-// The HF Space is used directly and the normal CORS proxy wrapper handles
-// browsers that cannot call the Space directly.
+// The Oracle Cloud Always Free VPS hosts the backend, exposed through
+// Cloudflare Tunnel for CORS-safe, always-on access.
 //
 // Each provider calls its own backend endpoint:
 //   GET /api/streams/:provider/movie|series/:tmdbId?...
 //   → { success, streams: [{ name, title, url, quality, headers? }] }
 //
+// VPS: 168.107.87.42 (Oracle Cloud VM.Standard.E2.1.Micro, Singapore)
 // Working providers (tested live 2026-08-01):
 //   vidfast   — vidfast.vc (movie+TV)
 //   notorrent — Stremio addon, 8-11 streams (movie+TV)
@@ -21,7 +22,7 @@ import { makeProviderContext } from "./makeProviderContext";
 import { getProxiedUrl } from "./proxiedFetch";
 import { ScrapeContext } from "./types";
 
-const TMDB_EMBED_BASE = "https://stycanine1-tmdb-embed-api.hf.space";
+const TMDB_EMBED_BASE = import.meta.env.VITE_TMDB_EMBED_URL || "https://stycanine1-tmdb-embed-api.hf.space";
 
 function toSameOriginEmbedUrl(url: string): string {
   return url;
