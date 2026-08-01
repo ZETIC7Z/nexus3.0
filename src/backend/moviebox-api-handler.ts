@@ -69,7 +69,7 @@ function getSingleHeader(req: VercelRequest, name: string): string | undefined {
 }
 
 function copyResponseHeaders(upstream: Response, res: VercelResponse): void {
-  for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "cache-control", "etag", "last-modified"]) {
+  for (const name of ["content-type", "content-range", "accept-ranges", "cache-control", "etag", "last-modified"]) {
     const value = upstream.headers.get(name);
     if (value) res.setHeader(name, value);
   }
