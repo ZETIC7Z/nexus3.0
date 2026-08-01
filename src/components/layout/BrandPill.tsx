@@ -9,42 +9,44 @@ export function BrandPill(props: {
   large?: boolean;
   noBackground?: boolean;
 }) {
-  const isMobile = useIsMobile();
+  const { isMobile } = useIsMobile();
 
-  // Logo sizes - smaller player logo
+  // The header switches to the compact square mark on mobile/tablet (<1024px).
+  // All other logo placements, including desktop, keep the full NEXUS lockup.
+  const logoSrc = isMobile && props.header
+    ? "/nexus-logo-mobile.png"
+    : "/nexus-logo-full.png";
+
   const getLogoSize = () => {
     if (props.large) {
-      return "h-18 md:h-20"; // Video player - smaller
+      return "h-18 md:h-20";
     }
     if (isMobile && props.header) {
-      return "h-14"; // Mobile header - more compact
+      return "h-14 w-14";
     }
-    return "h-16"; // Default/Desktop header
+    return "h-16";
   };
 
-  // On mobile header, NO background - just logo
   if (isMobile && props.header) {
     return (
       <img
-        src="/nexus-logo-full.png"
+        src={logoSrc}
         alt="NEXUS"
-        className={`object-contain ${getLogoSize()}`}
+        className={`shrink-0 object-contain ${getLogoSize()}`}
       />
     );
   }
 
-  // Video player or explicitly no background - NO background, just logo
   if (props.large || props.noBackground) {
     return (
       <img
-        src="/nexus-logo-full.png"
+        src={logoSrc}
         alt="NEXUS"
-        className={`object-contain ${getLogoSize()}`}
+        className={`shrink-0 object-contain ${getLogoSize()}`}
       />
     );
   }
 
-  // Desktop header - with background
   return (
     <div
       className={classNames(
@@ -56,9 +58,9 @@ export function BrandPill(props: {
       )}
     >
       <img
-        src="/nexus-logo-full.png"
+        src={logoSrc}
         alt="NEXUS"
-        className={`object-contain ${getLogoSize()}`}
+        className={`shrink-0 object-contain ${getLogoSize()}`}
       />
     </div>
   );

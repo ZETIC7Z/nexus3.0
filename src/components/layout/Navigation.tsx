@@ -173,7 +173,7 @@ export function Navigation(props: NavigationProps) {
           <div className="px-7 py-5 relative z-[60] flex flex-1 items-center justify-between">
             <div className="flex items-center space-x-1.5 ssm:space-x-3 pointer-events-auto">
               <Link
-                className="block tabbable rounded-full text-xs ssm:text-base"
+                className="block shrink-0 tabbable rounded-full text-xs ssm:text-base"
                 to="/"
                 onClick={() => window.scrollTo(0, 0)}
               >

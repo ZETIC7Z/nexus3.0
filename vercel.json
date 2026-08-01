@@ -1,14 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/tmdb/:path*",
-      "destination": "/api/tmdb-proxy/:path*"
-    },
-    {
-      "source": "/api/moviebox/:path*",
-      "destination": "/api/moviebox-proxy/:path*"
-    },
-    {
       "source": "/((?!api(?:/|$)).*)",
       "destination": "/"
     }
