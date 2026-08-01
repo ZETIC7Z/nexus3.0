@@ -153,15 +153,18 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   } else {
     pagePath = `/movie/${tmdbId}`;
   }
+  // In production, VC is blocked by Cloudflare (datacenter IPs) so don't
+  // waste time retrying — fail fast and let the next provider take over.
+  const isDev = import.meta.env.DEV;
   const pageRes = await req(
     vcUrl(pagePath),
     {
-      headers: import.meta.env.DEV
+      headers: isDev
         ? { Accept: "*/*", "Cache-Control": "no-cache", Pragma: "no-cache" }
         : { ...VC_HEADERS },
     },
-    15000,
-    2,
+    isDev ? 15000 : 8000,
+    isDev ? 2 : 0,
   );
   if (!pageRes.ok) throw new Error(`VidFast2: page HTTP ${pageRes.status}`);
   const html = await pageRes.text();
