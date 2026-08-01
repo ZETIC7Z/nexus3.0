@@ -28,10 +28,10 @@ function probeUrlFor(id: string): string | null {
     case "nexus-vidup":
       return `${hf}/api/streams/${id.replace("nexus-", "")}/movie/603`;
     case "nexus-vidfast2":
-      // Probe the VC endpoint — if Cloudflare blocks Vercel's IPs,
-      // the upstream returns 403, and Zephyr shows as unhealthy.
-      // On dev, Vite proxy injects Referer/UA so this always passes.
-      return "/api/vidfast2-vc/movie/603";
+      // Probe the CF Worker's /vc-proxy endpoint — the worker forwards to
+      // vidfast.vc with proper headers from Cloudflare's own edge, so it
+      // works on all platforms (Vercel, local dev, any browser).
+      return "https://vidfast.samxerz-zeticuz.workers.dev/vc-proxy?path=movie/603";
     case "nexus-anikai":
     case "nexus-anikoto":
       return `${hf}/api/streams/${id.replace("nexus-", "")}/series/37854?season=1&episode=1`;

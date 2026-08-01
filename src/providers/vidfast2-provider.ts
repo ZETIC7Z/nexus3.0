@@ -1,51 +1,43 @@
 // vidfast2-provider.ts
 // NEXUS — VidFast 2 provider (Cloudflare Worker encryption toolkit)
 // ---------------------------------------------------------------------------
-// Worker URL:   /api/vidfast2-worker  (Vite proxy → samxerz-zeticuz.workers.dev)
-// VidFast API:  /api/vidfast2-vc      (Vite proxy → vidfast.vc)
+// Worker URL:   https://vidfast.samxerz-zeticuz.workers.dev
 //
-// All external requests go through Vite's server-side proxy to avoid CORS.
-// The provider makes same-origin calls only — no cross-origin fetch.
+// All VC (vidfast.vc) calls route through the CF Worker's /vc-proxy endpoint.
+// The worker runs on Cloudflare's edge, so vidfast.vc's Cloudflare WAF won't
+// block it. This works identically on local dev, Vercel, and any browser.
 //
 // Flow:
-//   1. GET  /api/vidfast2-vc/{movie|tv}/{tmdbId}  → extract site token
-//   2. GET  /api/vidfast2-worker/route-config      → paths + headers
-//   3. POST /api/vidfast2-worker/generate          → encrypted payload
-//   4. POST /api/vidfast2-vc/{sp}/{sp}/{payload}   → encrypted servers
-//   5. POST /api/vidfast2-worker/decrypt            → server list
-//   6. POST /api/vidfast2-vc/{sp}/{stp}/{data}     → encrypted stream
-//   7. POST /api/vidfast2-worker/decrypt            → {url, tmdbId, tracks}
+//   1. GET  worker/vc-proxy?path=/{movie|tv}/{tmdbId}  → extract site token
+//   2. GET  worker/route-config                          → paths + headers
+//   3. POST worker/generate                              → encrypted payload
+//   4. POST worker/vc-proxy?path={sp}/{sp}/{payload}    → encrypted servers
+//   5. POST worker/decrypt                                → server list
+//   6. POST worker/vc-proxy?path={sp}/{stp}/{data}      → encrypted stream
+//   7. POST worker/decrypt                                → {url, tmdbId, tracks}
 //   8. Return NEXUS stream object
 // ---------------------------------------------------------------------------
 
 import { flags, labelToLanguageCode } from "@nexus/providers";
 import { makeProviderContext } from "./makeProviderContext";
-import { getProxiedUrl } from "./proxiedFetch";
 import { ScrapeContext } from "./types";
 
-// Worker & stream proxies always use same-origin routes (work on both Vite dev and Vercel).
-const WORKER_PROXY = "/api/vidfast2-worker";
+// CF Worker — handles /generate, /decrypt, /route-config, and /vc-proxy
+const WORKER_BASE = "https://vidfast.samxerz-zeticuz.workers.dev";
+
+// Stream proxy — same-origin route (Vite dev proxy or Vercel function)
 const STREAM_PROXY = "/api/vidfast2-stream";
 
-// VC calls need browser-emulation headers. In dev, Vite proxy injects them.
-// In production (Vercel), Cloudflare blocks datacenter IPs so we can't proxy
-// VC calls through Vercel functions. Instead, route them through the user's
-// configured CORS proxy which uses residential IPs.
-const VIDFAST_VC_BASE = "https://vidfast.vc";
-const VC_HEADERS: Record<string, string> = {
-  "Accept": "*/*",
-  "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
-  "Referer": "https://vidfast.vc/",
-  "X-Requested-With": "XMLHttpRequest",
-};
+// Real domain used only for Referer/Origin headers on stream CDN access
+const VIDFAST_REFERER = "https://vidfast.vc";
 
+// ── VC proxy via CF Worker ──────────────────────────────────────────────
+// All VC calls go through the CF Worker's /vc-proxy endpoint which adds
+// the required Referer, User-Agent, and X-Requested-With headers and
+// forwards to vidfast.vc. Cloudflare Workers run on Cloudflare's own edge,
+// so vidfast.vc's Cloudflare WAF never blocks these requests.
 function vcUrl(path: string): string {
-  if (import.meta.env.DEV) {
-    // Vite proxy injects VC_HEADERS server-side.
-    return `/api/vidfast2-vc${path}`;
-  }
-  // Production: route through the CORS proxy to bypass Cloudflare.
-  return getProxiedUrl(`${VIDFAST_VC_BASE}${path}`);
+  return `${WORKER_BASE}/vc-proxy?path=${encodeURIComponent(path)}`;
 }
 
 function makeStreamProxyUrl(url: string, kind: "m3u8-proxy" | "ts-proxy"): string {
@@ -59,9 +51,6 @@ function makeStreamProxyUrl(url: string, kind: "m3u8-proxy" | "ts-proxy"): strin
   );
   return `${STREAM_PROXY}/${kind}?${params.toString()}`;
 }
-
-// Real domain used only for Referer/Origin headers on stream CDN access
-const VIDFAST_REFERER = "https://vidfast.vc";
 
 // ---------------------------------------------------------------------------
 // Route-config cache (30 min TTL)
@@ -83,7 +72,7 @@ const RC_TTL = 30 * 60_000;
 
 async function getRouteConfig(): Promise<RouteConfigResponse> {
   if (_cached && Date.now() - _cachedAt < RC_TTL) return _cached;
-  const r = await fetch(`${WORKER_PROXY}/route-config`);
+  const r = await fetch(`${WORKER_BASE}/route-config`);
   if (!r.ok) throw new Error(`VidFast2: route-config HTTP ${r.status}`);
   const j = await r.json();
   if (!j.success) throw new Error(`VidFast2: route-config: ${j.error}`);
@@ -146,26 +135,15 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const { media } = ctx;
   const tmdbId = media.tmdbId;
 
-  // 1. Fetch vidfast.vc page via proxy to extract site token
+  // 1. Fetch vidfast.vc page via CF Worker proxy to extract site token
   let pagePath: string;
   if (media.type === "show" && media.season && media.episode) {
     pagePath = `/tv/${tmdbId}/${media.season.number}/${media.episode.number}`;
   } else {
     pagePath = `/movie/${tmdbId}`;
   }
-  // In production, VC is blocked by Cloudflare (datacenter IPs) so don't
-  // waste time retrying — fail fast and let the next provider take over.
-  const isDev = import.meta.env.DEV;
-  const pageRes = await req(
-    vcUrl(pagePath),
-    {
-      headers: isDev
-        ? { Accept: "*/*", "Cache-Control": "no-cache", Pragma: "no-cache" }
-        : { ...VC_HEADERS },
-    },
-    isDev ? 15000 : 8000,
-    isDev ? 2 : 0,
-  );
+  // VC call routed through CF Worker /vc-proxy — works everywhere
+  const pageRes = await req(vcUrl(pagePath), {}, 15000, 2);
   if (!pageRes.ok) throw new Error(`VidFast2: page HTTP ${pageRes.status}`);
   const html = await pageRes.text();
 
@@ -180,23 +158,22 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const { staticPath, serverPath, streamPath } = cfg.data;
 
   // 3. Generate payload
-  const gen = await (await req(`${WORKER_PROXY}/generate`, {
+  const gen = await (await req(`${WORKER_BASE}/generate`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ siteData: rawData }),
   }, 20000)).json();
   if (!gen.success) throw new Error(`VidFast2: /generate: ${gen.error}`);
   const payload = gen.payload;
 
-  // 4. Get encrypted servers from vidfast.vc (Vite proxy injects Referer/UA/X-Requested-With)
+  // 4. Get encrypted servers from vidfast.vc via CF Worker /vc-proxy
   const serversRes = await req(vcUrl(`/${staticPath}/${serverPath}/${payload}`), {
     method: "POST",
-    headers: import.meta.env.DEV ? {} : { ...VC_HEADERS },
   });
   if (!serversRes.ok) throw new Error(`VidFast2: servers HTTP ${serversRes.status}`);
   const encServers = await serversRes.text();
 
   // 5. Decrypt servers
-  const decServers = await (await req(`${WORKER_PROXY}/decrypt`, {
+  const decServers = await (await req(`${WORKER_BASE}/decrypt`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ response: encServers }),
   })).json();
@@ -204,17 +181,16 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const servers: Array<{ name: string; description: string; data: string }> = decServers.data;
   if (!Array.isArray(servers) || !servers.length) throw new Error("VidFast2: no servers");
 
-  // 6. Get encrypted stream (Vite proxy injects Referer/UA/X-Requested-With)
+  // 6. Get encrypted stream from vidfast.vc via CF Worker /vc-proxy
   const best = servers.find((s) => s.name === "vRapid") || servers[0];
   const streamRes = await req(vcUrl(`/${staticPath}/${streamPath}/${best.data}`), {
     method: "POST",
-    headers: import.meta.env.DEV ? {} : { ...VC_HEADERS },
   });
   if (!streamRes.ok) throw new Error(`VidFast2: stream HTTP ${streamRes.status}`);
   const encStream = await streamRes.text();
 
   // 7. Decrypt stream
-  const decStream = await (await req(`${WORKER_PROXY}/decrypt`, {
+  const decStream = await (await req(`${WORKER_BASE}/decrypt`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ response: encStream }),
   })).json();
@@ -265,14 +241,9 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
 export const vidfast2Provider = makeProviderContext({
   id: "nexus-vidfast2",
   name: "Zephyr 🔥",
-  rank: 1310,
+  rank: 1330,
   disabled: false,
   async scrape(ctx) {
-    // On production (Vercel), Cloudflare blocks datacenter IPs so VC calls
-    // always fail. Fail fast so the next provider takes over immediately.
-    if (!import.meta.env.DEV) {
-      throw new Error("Zephyr: unavailable on this deployment (VC blocked by Cloudflare)");
-    }
     try { return await scrapeVidFast2(ctx); }
     catch (e: any) { console.error("Zephyr:", e?.message ?? e); throw e; }
   },
