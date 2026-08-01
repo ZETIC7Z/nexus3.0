@@ -1,18 +1,4 @@
-type VercelRequest = {
-  method?: string;
-  query: Record<string, string | string[] | undefined>;
-  headers?: Record<string, string | string[] | undefined>;
-};
-
-type VercelResponse = {
-  status(code: number): VercelResponse;
-  setHeader(name: string, value: string | number): VercelResponse;
-  send(body: unknown): void;
-  write(chunk: Uint8Array): boolean;
-  end(): void;
-};
-
-async function streamResponseBody(body: ReadableStream<Uint8Array> | null, res: VercelResponse): Promise<void> {
+async function streamResponseBody(body, res) {
   if (!body) {
     res.end();
     return;
@@ -34,7 +20,7 @@ async function streamResponseBody(body: ReadableStream<Uint8Array> | null, res: 
 const ALLOWED_METHODS = new Set(["GET", "HEAD"]);
 const ALLOWED_PATHS = [/^search$/, /^detail\/[a-zA-Z0-9._~-]+$/, /^api\/stream\/[a-zA-Z0-9._~-]+$/, /^api\/proxy$/];
 
-function allowedMediaHosts(): Set<string> {
+function allowedMediaHosts() {
   return new Set(
     (process.env.MOVIEBOX_MEDIA_HOSTS ?? "bcdnxw.hakunaymatata.com")
       .split(",")
@@ -43,7 +29,7 @@ function allowedMediaHosts(): Set<string> {
   );
 }
 
-function validateMediaUrl(value: string | undefined, hosts: Set<string>): string | null {
+function validateMediaUrl(value, hosts) {
   if (!value) return null;
   try {
     const parsed = new URL(value);
@@ -54,7 +40,7 @@ function validateMediaUrl(value: string | undefined, hosts: Set<string>): string
   }
 }
 
-function getPath(query: VercelRequest["query"]): string {
+function getPath(query) {
   const value = query.path;
   const parts = Array.isArray(value) ? value : value ? [value] : [];
   return parts
@@ -63,19 +49,19 @@ function getPath(query: VercelRequest["query"]): string {
     .join("/");
 }
 
-function getSingleHeader(req: VercelRequest, name: string): string | undefined {
+function getSingleHeader(req, name) {
   const value = req.headers?.[name] ?? req.headers?.[name.toLowerCase()];
   return Array.isArray(value) ? value[0] : value;
 }
 
-function copyResponseHeaders(upstream: Response, res: VercelResponse): void {
+function copyResponseHeaders(upstream, res) {
   for (const name of ["content-type", "content-range", "accept-ranges", "cache-control", "etag", "last-modified"]) {
     const value = upstream.headers.get(name);
     if (value) res.setHeader(name, value);
   }
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   const method = (req.method ?? "GET").toUpperCase();
   if (!ALLOWED_METHODS.has(method)) {
     res.setHeader("Allow", "GET, HEAD");
@@ -116,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     query.set("url", mediaUrl);
   }
 
-  const headers: Record<string, string> = { Accept: getSingleHeader(req, "accept") ?? "application/json" };
+  const headers = { Accept: getSingleHeader(req, "accept") ?? "application/json" };
   const range = getSingleHeader(req, "range");
   if (range) headers.Range = range;
   const secret = process.env.MOVIEBOX_API_SECRET;

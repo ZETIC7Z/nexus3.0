@@ -1,19 +1,8 @@
-type VercelRequest = {
-  method?: string;
-  query: Record<string, string | string[] | undefined>;
-};
-
-type VercelResponse = {
-  status(code: number): VercelResponse;
-  setHeader(name: string, value: string): VercelResponse;
-  send(body: string): void;
-};
-
-function isV4Token(value: string): boolean {
+function isV4Token(value) {
   return value.split(".").length === 3;
 }
 
-function getPath(query: VercelRequest["query"]): string {
+function getPath(query) {
   const value = query.path;
   const parts = Array.isArray(value) ? value : value ? [value] : [];
   return parts
@@ -22,7 +11,7 @@ function getPath(query: VercelRequest["query"]): string {
     .join("/");
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.setHeader("Allow", "GET, HEAD");
     res.status(405).send("Method not allowed");
@@ -51,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers = { Accept: "application/json" };
   if (isV4Token(token)) headers.Authorization = `Bearer ${token}`;
   else query.set("api_key", token);
 
