@@ -1,16 +1,5 @@
 {
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "dist",
-  "installCommand": "pnpm install",
   "rewrites": [
-    {
-      "source": "/api/tmdb/(.*)",
-      "destination": "/api/tmdb?path=$1"
-    },
-    {
-      "source": "/api/moviebox/(.*)",
-      "destination": "/api/moviebox?path=$1"
-    },
     {
       "source": "/((?!api(?:/|$)).*)",
       "destination": "/"
