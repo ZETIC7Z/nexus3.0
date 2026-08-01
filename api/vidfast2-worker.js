@@ -6,53 +6,51 @@
 const UPSTREAM = "https://vidfast.samxerz-zeticuz.workers.dev";
 
 function getPath(query) {
-  const value = query.path;
-  const parts = Array.isArray(value) ? value : value ? [value] : [];
+  const value = query ? query.path : undefined;
+  if (!value) return "";
+  const parts = Array.isArray(value) ? value : [value];
   return parts
-    .map((part) => part.replace(/^\/+|\\/+$/g, ""))
+    .map((part) => String(part).replace(/^\/+|\\/+$/g, ""))
     .filter(Boolean)
     .join("/");
 }
 
 export default async function handler(req, res) {
   const method = (req.method ?? "GET").toUpperCase();
-  const path = getPath(req.query);
+  const query = req.query || {};
+  const path = getPath(query);
 
   if (!path) {
     res.status(404).send("Not found");
     return;
   }
 
-  // Build upstream URL
   const targetUrl = `${UPSTREAM}/${path}`;
 
-  // Forward headers and body
   const headers = { Accept: "application/json" };
-  if (req.headers["content-type"]) {
-    headers["Content-Type"] = Array.isArray(req.headers["content-type"])
-      ? req.headers["content-type"][0]
-      : req.headers["content-type"];
-  }
+  const ct = Array.isArray(req.headers["content-type"]) 
+    ? req.headers["content-type"][0] 
+    : req.headers["content-type"];
+  if (ct) headers["Content-Type"] = ct;
 
   try {
-    const upstream = await fetch(targetUrl, {
-      method,
-      headers,
-      body: method !== "GET" && method !== "HEAD" ? JSON.stringify(req.body) : undefined,
-    });
-
-    res.status(upstream.status);
-    const ct = upstream.headers.get("content-type");
-    if (ct) res.setHeader("Content-Type", ct);
-
-    if (method === "HEAD") {
-      res.send("");
-      return;
+    let body = undefined;
+    if (method !== "GET" && method !== "HEAD") {
+      body = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
     }
+
+    const upstream = await fetch(targetUrl, { method, headers, body });
+    res.status(upstream.status);
+    
+    const resCt = upstream.headers.get("content-type");
+    if (resCt) res.setHeader("Content-Type", resCt);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    if (method === "HEAD") { res.send(""); return; }
 
     const text = await upstream.text();
     res.send(text);
-  } catch {
-    res.status(502).send("VidFast2 Worker upstream unavailable");
+  } catch (e) {
+    res.status(502).send(e.message || "VidFast2 Worker upstream unavailable");
   }
 }
