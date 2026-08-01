@@ -55,7 +55,15 @@ function getSingleHeader(req, name) {
 }
 
 function copyResponseHeaders(upstream, res) {
-  for (const name of ["content-type", "content-range", "accept-ranges", "cache-control", "etag", "last-modified"]) {
+  for (const name of [
+    "content-type",
+    "content-length",
+    "content-range",
+    "accept-ranges",
+    "cache-control",
+    "etag",
+    "last-modified",
+  ]) {
     const value = upstream.headers.get(name);
     if (value) res.setHeader(name, value);
   }
@@ -89,9 +97,10 @@ export default async function handler(req, res) {
     }
   }
 
+  let mediaUrl = null;
   if (path === "api/proxy") {
     const hosts = allowedMediaHosts();
-    const mediaUrl = validateMediaUrl(
+    mediaUrl = validateMediaUrl(
       Array.isArray(req.query.url) ? req.query.url[0] : req.query.url,
       hosts,
     );
@@ -109,7 +118,13 @@ export default async function handler(req, res) {
   if (secret) headers["X-NEXUS-SECRET"] = secret;
 
   try {
-    const upstream = await fetch(`${upstreamBase}/${path}${query.toString() ? `?${query}` : ""}`, {
+    // Media URLs are validated against the allowlist above, then fetched
+    // directly. The MovieBox API only provides metadata and stream URLs; it
+    // does not implement its own `/api/proxy` endpoint.
+    const targetUrl = path === "api/proxy"
+      ? mediaUrl
+      : `${upstreamBase}/${path}${query.toString() ? `?${query}` : ""}`;
+    const upstream = await fetch(targetUrl, {
       method,
       headers,
     });
