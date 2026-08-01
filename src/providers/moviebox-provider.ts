@@ -391,27 +391,22 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
     throw new Error("MovieBox: no valid playable sources found");
   }
 
-  function proxyViaMovieBox(url: string): string {
-    if (!url) return url;
-    if (url.includes("/api/proxy")) return url;
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const base = origin ? `${origin}/api/moviebox` : MOVIEBOX_BASE;
-    return `${base}/api/proxy?url=${encodeURIComponent(url)}`;
-  }
-
+  // MovieBox MP4 URLs are pre-signed with ?sign=...&t=... and work directly.
+  // Proxy is bypassed for speed and reliability — the CDN geo-restricts
+  // datacenter IPs (Oracle Singapore) but serves browsers fine.
   const streamType = "file" as const;
   const sortedMp4 = [...mp4Sources].sort((a, b) => {
     const q = (r: string) => parseInt(r.replace(/\D/g, ""), 10) || 0;
     return q(b.resolution) - q(a.resolution);
   });
-  const bestUrl = proxyViaMovieBox(sortedMp4[0]!.url);
+  const bestUrl = sortedMp4[0]!.url;
 
   const qualities: Record<string, { type: "mp4"; url: string }> = {};
   if (streamType === "file") {
     for (const s of sortedMp4) {
       if (!s.url || !s.url.trim()) continue;
       const key = normalizeQuality(s.resolution);
-      qualities[key] = { type: "mp4", url: proxyViaMovieBox(s.url) };
+      qualities[key] = { type: "mp4", url: s.url };
     }
   }
 
@@ -456,7 +451,7 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
               id: `moviebox-audio-${code}`,
               label: dub.lanName,
               language: code,
-              url: proxyViaMovieBox(dubUrl),
+              url: dubUrl,
               default: false,
             });
           }

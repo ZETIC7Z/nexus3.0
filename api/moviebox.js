@@ -127,25 +127,15 @@ export default async function handler(req, res) {
   }
   const range = getSingleHeader(req, "range");
   if (range) headers.Range = range;
-  // Secret is for the upstream MovieBox API, never for the media CDN.
-  if (path !== "api/proxy") {
-    const secret = process.env.MOVIEBOX_API_SECRET;
-    if (secret) headers["X-NEXUS-SECRET"] = secret;
-  } else {
-    // Media CDN requires specific headers to serve content.
-    // Without these, bcdnxw.hakunaymatata.com returns 403.
-    headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
-    headers.Referer = "https://netfilm.world/";
-    headers.Origin = "https://netfilm.world";
-  }
+  // Secret is required by the upstream MovieBox VPS for authorization.
+  const secret = process.env.MOVIEBOX_API_SECRET;
+  if (secret) headers["X-NEXUS-SECRET"] = secret;
 
   try {
-    // Media URLs are validated against the allowlist above, then fetched
-    // directly. The MovieBox API only provides metadata and stream URLs; it
-    // does not implement its own `/api/proxy` endpoint.
-    const targetUrl = path === "api/proxy"
-      ? mediaUrl
-      : `${upstreamBase}/${path}${query.toString() ? `?${query}` : ""}`;
+    // ALL paths (including api/proxy) go through the upstream MovieBox VPS.
+    // The VPS api.py has a /api/proxy endpoint that adds required CDN headers
+    // (Referer, Origin, User-Agent) and handles Range streaming properly.
+    const targetUrl = `${upstreamBase}/${path}${query.toString() ? `?${query}` : ""}`;
     const upstream = await fetch(targetUrl, {
       method,
       headers,
