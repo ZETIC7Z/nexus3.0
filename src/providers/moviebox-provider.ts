@@ -234,8 +234,11 @@ function pickBestMatch(
     if (!best || score > best.score) best = { m, score };
   }
 
-  // Require a minimal confidence so we don't play the wrong title
-  if (best && best.score >= 30) return best.m;
+  // Require a minimal confidence so we don't play the wrong title.
+  // Lowered from 30 to allow partial matches (e.g. "Martian Land" for
+  // "The Martian") when the MovieBox backend returns relevant results
+  // under a slightly different name.
+  if (best && best.score >= 10) return best.m;
   return null;
 }
 
@@ -487,17 +490,17 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
 // ── Provider registration ────────────────────────────────────────────────────
 export const movieboxProvider = makeProviderContext({
   id: "nexus-moviebox",
-  name: "MovieBox 🔥",
+  name: "Nyxos ⚡",
   rank: 1300,
   disabled: false,
   async scrape(ctx) {
     try {
-      console.debug("MovieBox Scraper: scrape called with media:", JSON.stringify(ctx.media));
+      console.debug("Nyxos Scraper: scrape called with media:", JSON.stringify(ctx.media));
       const res = await scrapeMovieBox(ctx);
-      console.debug("MovieBox Scraper: scrape returned result:", JSON.stringify(res));
+      console.debug("Nyxos Scraper: scrape returned result:", JSON.stringify(res));
       return res;
     } catch (e: any) {
-      console.error("MovieBox Scraper: error occurred during scrape:", e.message, e.stack);
+      console.error("Nyxos Scraper: error occurred during scrape:", e.message, e.stack);
       throw e;
     }
   },

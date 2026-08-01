@@ -1,7 +1,7 @@
 // allowed-providers.ts
 // NEXUS — Per-Media Allowed Provider Registry
 // ---------------------------------------------------------------------------
-// Movies / TV shows :  MovieBox → VidFast → NoTorrent → VidUp
+// Movies / TV shows :  VidFast 2 → MovieBox → NoTorrent → VidUp → VidFast
 // Anime              :  MovieBox → AniKai → AniKoto
 // ---------------------------------------------------------------------------
 
@@ -68,9 +68,10 @@ export function getAllowedSourceIds(_mediaType: "movie" | "show", isAnime: boole
   return isAnime
     ? ["nexus-moviebox", "nexus-anikai", "nexus-anikoto"]
     : [
+        "nexus-vidfast2",
         "nexus-moviebox",
-        "nexus-vidfast",
         "nexus-notorrent",
         "nexus-vidup",
+        "nexus-vidfast",
       ];
 }

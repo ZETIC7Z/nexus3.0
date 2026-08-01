@@ -265,10 +265,10 @@ function makeEmbedProvider(
 }
 
 // Movie / TV providers — each shown separately in the source list
-export const vidfastProvider   = makeEmbedProvider("nexus-vidfast",   "VidFast ⚡",   1290, "vidfast");
-export const notorrentProvider = makeEmbedProvider("nexus-notorrent", "NoTorrent 🧲", 1280, "notorrent");
-export const vidupProvider     = makeEmbedProvider("nexus-vidup",     "VidUp 📤",     1252, "vidup");
+export const vidfastProvider   = makeEmbedProvider("nexus-vidfast",   "Setzu 💀",   1260, "vidfast");
+export const notorrentProvider = makeEmbedProvider("nexus-notorrent", "Astrix 👾", 1280, "notorrent");
+export const vidupProvider     = makeEmbedProvider("nexus-vidup",     "Xylos 😈",     1270, "vidup");
 
 // Anime providers (keep existing dub support via isDubStream check)
-export const anikaiProvider  = makeEmbedProvider("nexus-anikai",  "AniKai 🀄",  1250, "anikai");
-export const anikotoProvider = makeEmbedProvider("nexus-anikoto", "AniKoto 🀄", 1240, "anikoto");
+export const anikaiProvider  = makeEmbedProvider("nexus-anikai",  "Vexis 💣",  1250, "anikai");
+export const anikotoProvider = makeEmbedProvider("nexus-anikoto", "Morvyn 👺", 1240, "anikoto");

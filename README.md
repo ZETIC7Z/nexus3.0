@@ -1,36 +1,89 @@
-# NEXUS 3.0 (MovieBox & Zunime Edition)
+# NEXUS 3.0
 
-Welcome to **NEXUS 3.0**! 
+<p align="center">
+  <img src="/public/pwa-logo.svg" alt="NEXUS Banner" width="200" />
+</p>
 
-This repository is optimized for **Vercel Deployment** with exclusive MovieBox (movies & shows) and Zunime (anime) scrapers built-in. All proxies and API integrations are configured out of the box via `vercel.json` rewrites.
+<p align="center">
+  <b>NEXUS</b> — Free Movies, TV Shows & Anime Streaming<br>
+  <i>No ads. No sign-up. Just pure entertainment.</i>
+</p>
+
+---
+
+## Active Providers
+
+| Provider | Status | Type |
+|----------|--------|------|
+| **Nyxos ⚡** (MovieBox) | ✅ | Movies, TV, Anime — MP4 + Multi-Audio Dubs |
+| **Zephyr 🔥** (VidFast 2) | ✅ | Movies, TV — Cloudflare Worker Encryption |
+| **Astrix 👾** (NoTorrent) | ✅ | Movies, TV — Stremio Addon, 8-11 streams |
+| **Xylos 😈** (VidUp) | ✅ | Movies, TV — vidup.to |
+| **Setzu 💀** (VidFast) | ✅ | Movies, TV — vidfast.vc |
+| **Vexis 💣** (AniKai) | ✅ | Anime — anikai.watch |
+| **Morvyn 👺** (AniKoto) | ✅ | Anime — anikototv.to, Dub Support |
 
 ## Features
-- **MovieBox Scraper:** Blazing fast media scraper for all Movies and TV Shows.
-- **Zunime Scraper:** The best source for Anime series.
-- **Seamless Proxying:** Bypass CORS with `vercel.json` proxy rewrites.
-- **No Extensions Required:** Works natively in all modern browsers without installing extensions.
-- **One-Click Deploy:** Ready to deploy directly to Vercel.
+
+- **7 Active Providers** — Multi-source streaming with automatic failover
+- **Multi-Audio Dubs** — Switch languages on supported content via the player Audio menu
+- **No Ads** — Clean, ad-free streaming experience
+- **No Sign-Up Required** — Start watching instantly
+- **PWA Support** — Install as a native app on any device
+- **Subtitle Support** — External subtitles from OpenSubtitles, VDRK, and built-in tracks
+- **Watch Party** — Sync playback with friends in real-time
+- **Responsive Design** — Works on desktop, tablet, and mobile
 
 ## Quick Start
-1. Clone this repository
-2. Run `npm install`
-3. Run `npm run dev` to start locally
-4. Deploy to Vercel and it works out of the box!
 
-## Automated Project Changelog
+```bash
+# Clone the repository
+git clone https://github.com/ZETIC7Z/nexus3.0.git
 
-### [July 31, 2026 - 13:30] — Kamatera VPS Migration & TypeError Fix
-- **VPS Migration**: Updated `vite.config.mts` and `vercel.json` to proxy `/moviebox-api` and `/nexus-vidsrc` to the new Kamatera VPS IP (`45.130.165.139`) because the old one expired. MovieBox and VidSrc are now fully functional again.
-- **Fixed TypeError Crash**: Fixed `TypeError: Cannot read properties of null (reading 'skipForward5')` in `KeyboardCommandsEditModal.tsx` by providing a fallback to `DEFAULT_KEYBOARD_SHORTCUTS` if the user's `localStorage` has a corrupted or missing `keyboardShortcuts` state.
+# Install dependencies
+pnpm install
 
-### [July 25, 2026 - 00:30] — VidSrc and Zunime API Fixes
-- **VidSrc Stability:** Updated the VidSrc server on the VPS to automatically recreate the Playwright browser if it crashes or disconnects.
-- **VidSrc Connectivity:** Updated `vercel.json` to proxy `/nexus-vidsrc` to port `4001` on the VPS to match where the node process runs, fixing the "Failed to scrape" error in production.
-- **Zunime Connectivity:** Added the missing `/nexus-zunime`, `/nexus-zunime-worker`, and `/nexus-anilist` proxies to `vercel.json`, restoring Zunime provider and AniList functionality on the Vercel production deployment.
+# Start development server
+pnpm run dev
 
-### [July 24, 2026 - 23:58] — Fix scraping errors and production proxies: TMDB Proxy + Vercel SPA Routing
-- **Fixed "Failed to load metadata" crash**: The TMDB dev-server proxy (`/nexus-tmdb/3/`) was running in production. Vercel serves `index.html` (200 OK) for unknown routes, so the fetch succeeded with HTML instead of JSON — silently bypassing the fallback and crashing the app with `TypeError: Cannot read properties of undefined (reading 'length')`. Fixed by wrapping the proxy block with `import.meta.env.DEV` in `src/backend/metadata/tmdb.ts`.
-- **Fixed 404 on movie/TV pages**: Added `vercel.json` with SPA rewrite rule `"source": "/(.*)" → "destination": "/"` so all client-side routes work correctly.
-- **Flattened repository structure**: Moved all web app files from `nexus/` subdirectory to root to exactly match `xp-technologies-dev/p-stream` architecture, eliminating Vercel build detection issues.
-- **Fixed Vercel package manager detection**: Bumped `packageManager` to `pnpm@9.15.4` to eliminate `ERR_INVALID_THIS` fetch bug on Node.js 24.
-- **Files changed**: `src/backend/metadata/tmdb.ts`, `vercel.json`, `package.json`
+# Build for production
+pnpm run build
+```
+
+## Vercel Deployment
+
+This project is configured for one-click Vercel deployment:
+
+1. Fork or clone this repository
+2. Connect to Vercel
+3. Set required environment variables (see `example.env`)
+4. Deploy — `vercel.json` rewrites handle proxy routing automatically
+
+## Environment Variables
+
+See `example.env` for the full list. Key variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `MOVIEBOX_API_URL` | MovieBox VPS backend URL |
+| `VITE_TMDB_EMBED_URL` | TMDB Embed API (HF Space) |
+| `TMDB_READ_API_KEY` | TMDB API v4 token |
+| `VITE_CORS_PROXY_URL` | CORS proxy for external requests |
+| `VITE_M3U8_PROXY_URL` | M3U8/HLS stream proxy |
+
+## Tech Stack
+
+- **Frontend:** React 18 + TypeScript + Vite
+- **Styling:** Tailwind CSS
+- **Backend:** Vercel Serverless Functions + Cloudflare Workers
+- **APIs:** TMDB, MovieBox, HuggingFace Spaces
+
+## Developer
+
+**ZETICUZ** — [zeticuz.online](https://zeticuz.online)
+
+---
+
+<p align="center">
+  <sub>© 2025-2026 ZETICUZ · All Rights Reserved</sub>
+</p>

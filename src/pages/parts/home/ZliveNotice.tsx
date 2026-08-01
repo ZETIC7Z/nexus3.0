@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import { Icon, Icons } from "@/components/Icon";
 
-const STORAGE_KEY = "nexus::zlive-notice-dismissed";
-const ZLIVE_URL = "https://zlive.st";
-
-// Same floating-pill convention as DiscordNotice, stacked directly under it
-// (fixed top offset assumes DiscordNotice's own height + a gap -- if
-// DiscordNotice is dismissed/absent this one just sits slightly lower than
-// it strictly needs to, which is a fine tradeoff for not needing to measure
-// DiscordNotice's real height at runtime).
+const STORAGE_KEY = "nexus::maintenance-notice-dismissed";
+const MAIN_NETWORK_URL = "https://zeticuz.online";
+// SITE DEVELOPER: ZETICUZ
 export function ZliveNotice() {
-  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [entered, setEntered] = useState(false);
 
@@ -64,31 +57,31 @@ export function ZliveNotice() {
         <div className="relative min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <p className="text-sm font-semibold leading-tight text-white">
-              {t("zliveNotice.title")}
+              Maintenance In Progress
             </p>
             <span className="rounded-full bg-white/10 px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-wide text-white/50">
-              {t("zliveNotice.badge")}
+              NEXUS
             </span>
           </div>
           <p className="text-xs leading-snug text-white/60">
-            {t("zliveNotice.description")}
+            Routine updates underway. If you experience downtime, visit our main network. — [DEV] ZETICUZ
           </p>
         </div>
 
         <a
-          href={ZLIVE_URL}
+          href={MAIN_NETWORK_URL}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           onClick={dismiss}
           className="relative flex-shrink-0 rounded-lg bg-[#fb7124] px-3 py-1.5 text-xs font-bold text-white transition-[background-color,transform] duration-150 ease-spring hover:-translate-y-0.5 hover:bg-[#e0501a] active:translate-y-0"
         >
-          {t("zliveNotice.visit")}
+          Visit
         </a>
 
         <button
           type="button"
           onClick={dismiss}
-          aria-label={t("zliveNotice.dismiss")}
+          aria-label="Dismiss"
           className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors duration-150 hover:bg-white/5 hover:text-white/80"
         >
           <Icon icon={Icons.X} className="text-base" />

@@ -27,6 +27,8 @@ function probeUrlFor(id: string): string | null {
     case "nexus-vidfast":
     case "nexus-vidup":
       return `${hf}/api/streams/${id.replace("nexus-", "")}/movie/603`;
+    case "nexus-vidfast2":
+      return "/api/vidfast2-worker/route-config";
     case "nexus-anikai":
     case "nexus-anikoto":
       return `${hf}/api/streams/${id.replace("nexus-", "")}/series/37854?season=1&episode=1`;
@@ -54,9 +56,11 @@ async function probeOne(id: string, name: string): Promise<ProviderHealth> {
   try {
     // The HF Space explicitly allows browser CORS. Probe it directly so a
     // flaky user-configured CORS proxy cannot hide otherwise working sources.
-    const probeTarget = url.startsWith("https://stycanine1-tmdb-embed-api.hf.space/")
-      ? url
-      : getProxiedUrl(url);
+    const probeTarget =
+      url.startsWith("/") ||
+      url.startsWith("https://stycanine1-tmdb-embed-api.hf.space/")
+        ? url
+        : getProxiedUrl(url);
     const res = await fetch(probeTarget, { signal: ctrl.signal, method: "GET", mode: "cors" });
     healthy = res.status >= 200 && res.status < 400;
   } catch {

@@ -45,6 +45,24 @@ function looksLike403Body(t: string): boolean {
   return /\b403\b/.test(t) || /forbidden/i.test(t);
 }
 
+// VidFast2's stream proxy rewrites media segments to /ts-proxy. These URLs
+// are already CORS-safe; wrapping them in the generic destination proxy
+// causes the observed 403. Keep this exception narrowly scoped to VidFast2.
+function isEncryptedSiteSegmentProxy(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return (
+      /^\/api\/(vidfast2)-stream\/ts-proxy$/.test(
+        parsed.pathname,
+      ) ||
+      (parsed.hostname === "pstream.dovetechnology.org" &&
+        parsed.pathname === "/ts-proxy")
+    );
+  } catch {
+    return false;
+  }
+}
+
 const MAX_RETRIES = 12;
 const BASE_DELAY = 250;
 const MAX_DELAY = 3000;
@@ -55,7 +73,7 @@ export class ArtemisRetryLoader extends DefaultLoader {
   load(context: any, config: any, callbacks: any): void {
     let url: string = context?.url ?? "";
 
-    if (!isExtensionActiveCached()) {
+    if (!isExtensionActiveCached() && !isEncryptedSiteSegmentProxy(url)) {
       const proxyBase = getLoadbalancedProxyUrl();
       if (proxyBase && url && !url.includes("destination=") && !url.includes("m3u8-proxy")) {
         context.url = `${proxyBase}?destination=${encodeURIComponent(url)}`;

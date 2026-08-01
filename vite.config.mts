@@ -47,7 +47,13 @@ const captioningPackages = [
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
   const serverEnv = loadEnv(mode, process.cwd(), "");
-  const movieBoxTarget = serverEnv.MOVIEBOX_API_URL || "http://45.130.165.139:8000";
+  // Only use the server-visible absolute MOVIEBOX_API_URL; the Vite-prefixed
+  // client env may contain a relative path that Vite's proxy cannot target.
+  // Fall back to the deployed Vercel API when no local backend is configured.
+  const movieBoxTarget =
+    serverEnv.MOVIEBOX_API_URL?.startsWith("http")
+      ? serverEnv.MOVIEBOX_API_URL
+      : "https://nexus-test-ruby.vercel.app/api/moviebox";
   const movieBoxSecret = serverEnv.MOVIEBOX_API_SECRET || "";
   return {
     base: env.VITE_BASE_URL || "/",
@@ -207,6 +213,34 @@ export default defineConfig(({ mode }) => {
 
     server: {
       proxy: {
+        // ── VidFast 2 — Cloudflare Worker (encryption toolkit) ──────────
+        "/api/vidfast2-worker": {
+          target: "https://vidfast.samxerz-zeticuz.workers.dev",
+          changeOrigin: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-worker/, ""),
+        },
+        // ── VidFast 2 — vidfast.vc direct API calls ─────────────────────
+        "/api/vidfast2-vc": {
+          target: "https://vidfast.vc",
+          changeOrigin: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-vc/, ""),
+          // The browser can't set User-Agent or Referer via fetch() — the
+          // proxy must inject them server-side. These are static constants
+          // from the worker's config.js.
+          headers: {
+            "Referer": "https://vidfast.vc/",
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        },
+        // VidFast2 playback only: route the CDN playlist/segments through
+        // the known-working M3U8 proxy while retaining the requested query.
+        "/api/vidfast2-stream": {
+          target: "https://pstream.dovetechnology.org",
+          changeOrigin: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-stream/, ""),
+        },
+
         // ── MovieBox server-side compatibility route ──────────────────────
         "/api/moviebox": {
           target: movieBoxTarget,

@@ -8,11 +8,9 @@ import { Icon, Icons } from "@/components/Icon";
 import { LinksDropdown } from "@/components/layout/LinksDropdown";
 import { useDownloadModal } from "@/components/overlays/downloadModal";
 import { useNotifications } from "@/components/overlays/notificationsModal";
-import { useTipJar } from "@/components/overlays/tipJarModal";
 import { Lightbar } from "@/components/utils/Lightbar";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { BlurEllipsis } from "@/pages/layouts/SubPageLayout";
-import { conf } from "@/setup/config";
 import { useBannerSize } from "@/stores/banner";
 import { usePreferencesStore } from "@/stores/preferences";
 
@@ -69,7 +67,6 @@ export function Navigation(props: NavigationProps) {
   const { loggedIn } = useAuth();
   const [scrollPosition, setScrollPosition] = useState(0);
   const { openNotifications, getUnreadCount } = useNotifications();
-  const { openTipJar } = useTipJar();
   const { openDownloadModal } = useDownloadModal();
 
   useEffect(() => {
@@ -180,20 +177,6 @@ export function Navigation(props: NavigationProps) {
                 <BrandPill clickable header />
               </Link>
               <a
-                href={conf().DISCORD_LINK}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xl text-white tabbable rounded-full backdrop-blur-lg"
-              >
-                <IconPatch
-                  icon={Icons.DISCORD}
-                  clickable
-                  downsized
-                  navigation
-                />
-              </a>
-
-              <a
                 onClick={() => openDownloadModal()}
                 rel="noreferrer"
                 className="text-xl text-white tabbable rounded-full backdrop-blur-lg"
@@ -223,14 +206,6 @@ export function Navigation(props: NavigationProps) {
                     </span>
                   ) : null;
                 })()}
-              </a>
-              <a
-                onClick={() => openTipJar()}
-                rel="noreferrer"
-                className="text-xl text-white tabbable rounded-full backdrop-blur-lg"
-                title="Tip Jar"
-              >
-                <IconPatch icon={Icons.TIP_JAR} clickable downsized navigation />
               </a>
             </div>
             <div className="relative pointer-events-auto flex items-center gap-3">
