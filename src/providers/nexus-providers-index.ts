@@ -19,9 +19,11 @@ import { vidfast2Provider } from "./vidfast2-provider";
 import { getHealthyProviders, type ProbeableProvider } from "./provider-health";
 
 // Ordered by rank (highest first).
+// Movie / TV:  Nyxos → Zephyr → Astrix → Xylos → Setzu
+// Anime:       Vexis → Morvyn
 export const nexusCustomProviders = [
-  vidfast2Provider,      // 1295 — Zephyr (Cloudflare Worker, standalone)
-  movieboxProvider,      // 1290 — Nyxos (self-hosted VPS, MP4 + multi-audio dubs)
+  movieboxProvider,      // 1300 — Nyxos (self-hosted VPS, MP4 + multi-audio dubs)
+  vidfast2Provider,      // 1310 — Zephyr (Cloudflare Worker, dev only — VC blocked on Vercel)
   notorrentProvider,     // 1280 — Astrix (Stremio addon, movie+TV, 8-11 streams)
   vidupProvider,         // 1252 — Xylos (vidup.to, movie+TV)
   vidfastProvider,       // 1240 — Setzu (vidfast.vc, movie+TV)

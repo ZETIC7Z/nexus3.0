@@ -28,7 +28,10 @@ function probeUrlFor(id: string): string | null {
     case "nexus-vidup":
       return `${hf}/api/streams/${id.replace("nexus-", "")}/movie/603`;
     case "nexus-vidfast2":
-      return "/api/vidfast2-worker/route-config";
+      // Probe the VC endpoint — if Cloudflare blocks Vercel's IPs,
+      // the upstream returns 403, and Zephyr shows as unhealthy.
+      // On dev, Vite proxy injects Referer/UA so this always passes.
+      return "/api/vidfast2-vc/movie/603";
     case "nexus-anikai":
     case "nexus-anikoto":
       return `${hf}/api/streams/${id.replace("nexus-", "")}/series/37854?season=1&episode=1`;

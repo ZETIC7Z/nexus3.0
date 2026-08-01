@@ -491,7 +491,7 @@ export async function scrapeMovieBox(ctx: ScrapeContext) {
 export const movieboxProvider = makeProviderContext({
   id: "nexus-moviebox",
   name: "Nyxos ⚡",
-  rank: 1300,
+  rank: 1320,
   disabled: false,
   async scrape(ctx) {
     try {

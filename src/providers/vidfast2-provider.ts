@@ -268,6 +268,11 @@ export const vidfast2Provider = makeProviderContext({
   rank: 1310,
   disabled: false,
   async scrape(ctx) {
+    // On production (Vercel), Cloudflare blocks datacenter IPs so VC calls
+    // always fail. Fail fast so the next provider takes over immediately.
+    if (!import.meta.env.DEV) {
+      throw new Error("Zephyr: unavailable on this deployment (VC blocked by Cloudflare)");
+    }
     try { return await scrapeVidFast2(ctx); }
     catch (e: any) { console.error("Zephyr:", e?.message ?? e); throw e; }
   },

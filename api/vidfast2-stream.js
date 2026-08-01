@@ -1,32 +1,27 @@
 // api/vidfast2-stream.js
-// Vercel serverless function — transparent proxy for VidFast2 M3U8/TS playback.
-// Forwards to the configured M3U8 proxy with VidFast referer/origin headers.
-
-const M3U8_PROXY = process.env.VITE_M3U8_PROXY_URL || "https://pstream.dovetechnology.org";
+// Vercel serverless function — transparent proxy for VidFast2 HLS/TS playback.
+// Proxies stream segments directly with the required Referer/Origin headers.
+// Does NOT go through a separate M3U8 proxy — Vercel function timeout (10s)
+// is fine for HLS playlists and individual .ts segments.
 
 export default async function handler(req, res) {
   const path = (req.query?.path || "").replace(/^\/+|\/+$/g, "");
   if (!path) { res.status(400).send("Missing path"); return; }
 
-  // Rebuild upstream URL — forward ALL query params except "path"
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(req.query || {})) {
-    if (k === "path") continue;
-    for (const item of Array.isArray(v) ? v : [v]) params.append(k, item);
-  }
-  const qs = params.toString();
-  const targetUrl = `${M3U8_PROXY}/${path}${qs ? "?" + qs : ""}`;
+  // The actual stream URL is in the "url" query param
+  const streamUrl = req.query?.url;
+  if (!streamUrl) { res.status(400).send("Missing 'url' query parameter"); return; }
 
   const headers = {
     Accept: "*/*",
     Referer: "https://vidfast.vc/",
     Origin: "https://vidfast.vc",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
   };
 
   try {
     const method = (req.method || "GET").toUpperCase();
-    const upstream = await fetch(targetUrl, { method, headers });
+    const upstream = await fetch(streamUrl, { method, headers });
     res.status(upstream.status);
     const ct = upstream.headers.get("content-type");
     if (ct) res.setHeader("Content-Type", ct);
