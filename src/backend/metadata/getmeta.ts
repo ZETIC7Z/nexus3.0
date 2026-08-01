@@ -79,6 +79,8 @@ export async function getMetaFromId(
   id: string,
   seasonId?: string,
 ): Promise<DetailedMeta | null> {
+  if (!/^\d+$/.test(id)) return null;
+
   if (type === MWMediaType.SERIES) {
     const { getImdbOverride } = await import("./imdbMetadataProvider");
     const override = await getImdbOverride(id, seasonId);
@@ -101,19 +103,19 @@ export async function getMetaFromId(
       selectedSeason = seasons.find((v) => v.season_number === 1) ?? seasons[0];
     }
 
-    if (selectedSeason) {
-      const episodes = await getEpisodes(
-        details.id.toString(),
-        selectedSeason.season_number,
-      );
+    if (!selectedSeason) return null;
 
-      seasonData = {
-        id: selectedSeason.id.toString(),
-        season_number: selectedSeason.season_number,
-        title: selectedSeason.name,
-        episodes,
-      };
-    }
+    const episodes = await getEpisodes(
+      details.id.toString(),
+      selectedSeason.season_number,
+    );
+
+    seasonData = {
+      id: selectedSeason.id.toString(),
+      season_number: selectedSeason.season_number,
+      title: selectedSeason.name,
+      episodes,
+    };
   }
 
   const tmdbmeta = formatTMDBMetaResult(details, type);

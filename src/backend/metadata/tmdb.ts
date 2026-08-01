@@ -82,8 +82,8 @@ export function formatTMDBMeta(
   const type = TMDBMediaToMediaType(media.object_type);
   let seasons: undefined | MWSeasonMeta[];
   if (type === MWMediaType.SERIES) {
-    seasons = media.seasons
-      ?.sort((a, b) => a.season_number - b.season_number)
+    seasons = (media.seasons ?? [])
+      .sort((a, b) => a.season_number - b.season_number)
       .map(
         (v): MWSeasonMeta => ({
           title: v.title,
@@ -107,7 +107,7 @@ export function formatTMDBMeta(
           id: season.id.toString(),
           number: season.season_number,
           title: season.title,
-          episodes: season.episodes
+          episodes: (season.episodes ?? [])
             .sort((a, b) => a.episode_number - b.episode_number)
             .map(formatTMDBEpisode),
         }
@@ -157,7 +157,7 @@ export function decodeTMDBId(
   paramId: string,
 ): { id: string; type: MWMediaType } | null {
   const [prefix, type, id] = paramId.split("-", 3);
-  if (prefix !== "tmdb") return null;
+  if (prefix !== "tmdb" || !/^\d+$/.test(id ?? "")) return null;
   let mediaType;
   try {
     mediaType = TMDBMediaToMediaType(type as TMDBContentTypes);
@@ -236,7 +236,7 @@ export async function multiSearch(
     page: 1,
   });
   // filter out results that aren't movies or shows
-  const results = data.results.filter(
+  const results = (Array.isArray(data.results) ? data.results : []).filter(
     (r) =>
       r.media_type === TMDBContentTypes.MOVIE ||
       r.media_type === TMDBContentTypes.TV,
@@ -254,7 +254,7 @@ export async function searchMovies(
     include_adult: false,
     page: 1,
   });
-  return data.results.map((result) => ({
+  return (Array.isArray(data.results) ? data.results : []).map((result) => ({
     ...result,
     media_type: TMDBContentTypes.MOVIE,
   }));
@@ -270,7 +270,7 @@ export async function searchTVShows(
     include_adult: false,
     page: 1,
   });
-  return data.results.map((result) => ({
+  return (Array.isArray(data.results) ? data.results : []).map((result) => ({
     ...result,
     media_type: TMDBContentTypes.TV,
   }));
@@ -367,8 +367,11 @@ export async function getMediaDetails<
 
     // Fetch episodes for each season
     const showDetails = showData as TMDBShowData;
-    const allEpisodesBySeason = new Array(showDetails.seasons.length);
-    const seasonsQueue = showDetails.seasons.map((season, index) => ({
+    const seasons = Array.isArray(showDetails.seasons)
+      ? showDetails.seasons
+      : [];
+    const allEpisodesBySeason = new Array(seasons.length);
+    const seasonsQueue = seasons.map((season, index) => ({
       season,
       index,
     }));
@@ -627,7 +630,7 @@ export async function getMediaVideos(
 ): Promise<TMDBVideo[]> {
   const endpoint = type === TMDBContentTypes.MOVIE ? "movie" : "tv";
   const data = await get<TMDBVideosResponse>(`/${endpoint}/${id}/videos`);
-  return data.results.filter(
+  return (Array.isArray(data.results) ? data.results : []).filter(
     (video) =>
       video.site === "YouTube" &&
       (video.type === "Trailer" || video.type === "Teaser"),
@@ -648,7 +651,7 @@ export async function getRelatedMedia(
     results: TMDBMovieSearchResult[] | TMDBShowSearchResult[];
   }>(`/${endpoint}/${id}/recommendations`);
 
-  return data.results.slice(0, limit);
+  return (Array.isArray(data.results) ? data.results : []).slice(0, limit);
 }
 
 /** Fetches popular, well-voted media matching the given genres. */
@@ -670,7 +673,7 @@ export async function getMediaByGenres(
   // discover results lack media_type; stamp it back on.
   const mediaType =
     type === TMDBContentTypes.MOVIE ? TMDBContentTypes.MOVIE : TMDBContentTypes.TV;
-  return data.results.slice(0, limit).map((r) => ({
+  return (Array.isArray(data.results) ? data.results : []).slice(0, limit).map((r) => ({
     ...r,
     media_type: mediaType,
   })) as TMDBMovieSearchResult[] | TMDBShowSearchResult[];
@@ -705,7 +708,7 @@ export async function getMediaByCompanies(
     "vote_count.gte": 200,
     include_adult: false,
   });
-  return data.results.slice(0, limit).map((r) => ({
+  return (Array.isArray(data.results) ? data.results : []).slice(0, limit).map((r) => ({
     ...r,
     media_type: type,
   })) as TMDBMovieSearchResult[] | TMDBShowSearchResult[];
