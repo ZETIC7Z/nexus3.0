@@ -985,6 +985,10 @@
         "errorNotSupported": "The media or media provider object is not supported."
       },
       "autoResumeText": "There was an error trying to play the media. Automatically trying the other sources...",
+      "switchingBadge": "Auto-recovering",
+      "exhaustedBadge": "All sources failed",
+      "exhaustedText": "We tried every available source and none of them could play this media. Please try again later or pick a source manually.",
+      "resuming": "Resuming...",
       "copyDebugInfo": "Copy debug info",
       "debugInfo": "Check console for more details.",
       "homeButton": "Go home",

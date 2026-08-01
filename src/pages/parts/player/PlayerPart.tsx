@@ -264,6 +264,7 @@ export function PlayerPart(props: PlayerPartProps) {
       <Player.VolumeChangedPopout />
       <Player.SubtitleDelayPopout />
       <Player.SpeedChangedPopout />
+      <Player.AutoFallbackPopout />
       <Player.TIDBSubmissionSuccessPopout />
       <Player.UnreleasedEpisodeOverlay />
 

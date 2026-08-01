@@ -7,6 +7,7 @@ import { IconPill } from "@/components/layout/IconPill";
 import { useModal } from "@/components/overlays/Modal";
 import { Paragraph } from "@/components/text/Paragraph";
 import { Title } from "@/components/text/Title";
+import { getCachedMetadata } from "@/backend/helpers/providerApi";
 import { useOverlayRouter } from "@/hooks/useOverlayRouter";
 import { ErrorContainer, ErrorLayout } from "@/pages/layouts/ErrorLayout";
 import { getMediaKey } from "@/stores/player/slices/source";
@@ -14,6 +15,14 @@ import { usePlayerStore } from "@/stores/player/store";
 import { usePreferencesStore } from "@/stores/preferences";
 
 import { ErrorCardInModal } from "../errors/ErrorCard";
+
+function lookupSourceName(sourceId: string): string | null {
+  try {
+    return getCachedMetadata().find((s) => s.id === sourceId)?.name ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export interface PlaybackErrorPartProps {
   onResume?: (startFromSourceId: string) => void;
@@ -30,6 +39,7 @@ export function PlaybackErrorPart(props: PlaybackErrorPartProps) {
   const failedEmbedsPerMedia = usePlayerStore((s) => s.failedEmbedsPerMedia);
   const addFailedSource = usePlayerStore((s) => s.addFailedSource);
   const addFailedEmbed = usePlayerStore((s) => s.addFailedEmbed);
+  const setAutoFallbackPopout = usePlayerStore((s) => s.setAutoFallbackPopout);
   const modal = useModal("error");
   const settingsRouter = useOverlayRouter("settings");
   const hasOpenedSettings = useRef(false);
@@ -41,46 +51,57 @@ export function PlaybackErrorPart(props: PlaybackErrorPartProps) {
     (s) => s.enableAutoResumeOnPlaybackError,
   );
 
-  // Mark the failed source/embed and handle UI when a playback error occurs
+  // Mark the failed source/embed and handle UI when a playback error occurs.
+  // Merging the previous two effects ensures addFailedEmbed/addFailedSource run
+  // BEFORE the optional resume call so the next scraper pass sees the failure.
   useEffect(() => {
-    if (playbackError && currentSourceId) {
-      // Only mark source/embed as failed for fatal errors
-      const isFatalError =
-        playbackError.type === "hls"
-          ? (playbackError.hls?.fatal ?? false)
-          : playbackError.type === "htmlvideo";
+    if (!playbackError || !currentSourceId) return;
 
-      if (isFatalError) {
-        // If there's an active embed, disable that embed instead of the source
-        if (currentEmbedId) {
-          addFailedEmbed(currentSourceId, currentEmbedId);
+    const isFatalError =
+      playbackError.type === "hls"
+        ? (playbackError.hls?.fatal ?? false)
+        : playbackError.type === "htmlvideo";
 
-          // Check if all embeds for this source have now failed
-          // If so, disable the entire source
-          const mediaKey = getMediaKey(meta);
-          const failedEmbeds =
-            mediaKey && failedEmbedsPerMedia[mediaKey]
-              ? failedEmbedsPerMedia[mediaKey]
-              : {};
-          const failedEmbedsForSource = failedEmbeds[currentSourceId] || [];
-          // For now, we'll assume if we have 2+ failed embeds for a source, disable it
-          // This is a simple heuristic - we could make it more sophisticated
-          if (failedEmbedsForSource.length >= 2) {
-            addFailedSource(currentSourceId);
-          }
-        } else {
-          // No embed active, disable the source
+    const willAutoResume =
+      enableAutoResumeOnPlaybackError &&
+      !props.autoResumeExhausted &&
+      !!props.currentSourceId &&
+      !!props.onResume;
+
+    if (isFatalError) {
+      if (currentEmbedId) {
+        addFailedEmbed(currentSourceId, currentEmbedId);
+
+        const mediaKey = getMediaKey(meta);
+        const failedEmbeds =
+          mediaKey && failedEmbedsPerMedia[mediaKey]
+            ? failedEmbedsPerMedia[mediaKey]
+            : {};
+        const failedEmbedsForSource = failedEmbeds[currentSourceId] || [];
+        if (failedEmbedsForSource.length >= 2) {
           addFailedSource(currentSourceId);
         }
+      } else {
+        addFailedSource(currentSourceId);
       }
+    }
 
-      if (!hasOpenedSettings.current && (!enableAutoResumeOnPlaybackError || props.autoResumeExhausted)) {
-        hasOpenedSettings.current = true;
-        // Reset the last successful source when a playback error occurs
-        setLastSuccessfulSource(null);
-        settingsRouter.open();
-        settingsRouter.navigate("/source");
-      }
+    // If auto-resume is going to run, fire it now (single effect = single source of truth)
+    if (willAutoResume && !hasAutoResumed.current) {
+      hasAutoResumed.current = true;
+      const failedName = lookupSourceName(currentSourceId);
+      setAutoFallbackPopout(true, failedName);
+      props.onResume!(currentSourceId);
+      // Don't open the source picker — auto-resume is taking over.
+      return;
+    }
+
+    // Otherwise, user needs to pick a source manually.
+    if (!hasOpenedSettings.current) {
+      hasOpenedSettings.current = true;
+      setLastSuccessfulSource(null);
+      settingsRouter.open();
+      settingsRouter.navigate("/source");
     }
   }, [
     playbackError,
@@ -90,27 +111,9 @@ export function PlaybackErrorPart(props: PlaybackErrorPartProps) {
     failedEmbedsPerMedia,
     addFailedSource,
     addFailedEmbed,
+    setAutoFallbackPopout,
     settingsRouter,
     setLastSuccessfulSource,
-    enableAutoResumeOnPlaybackError,
-    props.autoResumeExhausted,
-  ]);
-
-  // Automatically resume scraping from the next source if enabled
-  useEffect(() => {
-    if (
-      playbackError &&
-      !hasAutoResumed.current &&
-      enableAutoResumeOnPlaybackError &&
-      !props.autoResumeExhausted &&
-      props.currentSourceId &&
-      props.onResume
-    ) {
-      hasAutoResumed.current = true;
-      props.onResume!(props.currentSourceId!);
-    }
-  }, [
-    playbackError,
     enableAutoResumeOnPlaybackError,
     props.autoResumeExhausted,
     props.currentSourceId,
@@ -125,26 +128,40 @@ export function PlaybackErrorPart(props: PlaybackErrorPartProps) {
   return (
     <ErrorLayout>
       <ErrorContainer>
-        <IconPill icon={Icons.WAND}>{t("player.playbackError.badge")}</IconPill>
-        <Title>{t("player.playbackError.title")}</Title>
-        <Paragraph>
-          {enableAutoResumeOnPlaybackError && !props.autoResumeExhausted
-            ? t("player.playbackError.autoResumeText")
-            : t("player.playbackError.text")}
-        </Paragraph>
+        {props.autoResumeExhausted ? (
+          <>
+            <IconPill icon={Icons.WAND}>
+              {t("player.playbackError.exhaustedBadge")}
+            </IconPill>
+            <Title>{t("player.playbackError.title")}</Title>
+            <Paragraph>{t("player.playbackError.exhaustedText")}</Paragraph>
+          </>
+        ) : enableAutoResumeOnPlaybackError ? (
+          <>
+            <IconPill icon={Icons.WAND}>
+              {t("player.playbackError.switchingBadge")}
+            </IconPill>
+            <Title>{t("player.playbackError.title")}</Title>
+            <Paragraph>{t("player.playbackError.autoResumeText")}</Paragraph>
+          </>
+        ) : (
+          <>
+            <IconPill icon={Icons.WAND}>{t("player.playbackError.badge")}</IconPill>
+            <Title>{t("player.playbackError.title")}</Title>
+            <Paragraph>{t("player.playbackError.text")}</Paragraph>
+          </>
+        )}
         <div className="flex gap-3">
-          {props.currentSourceId &&
-            props.onResume &&
-            (!enableAutoResumeOnPlaybackError || props.autoResumeExhausted) && (
-              <Button
-                onClick={() => props.onResume!(props.currentSourceId!)}
-                theme="purple"
-                padding="md:px-12 p-2.5"
-                className="mt-6"
-              >
-                {t("player.playbackError.resumeButton")}
-              </Button>
-            )}
+          {props.currentSourceId && props.onResume && (
+            <Button
+              onClick={() => props.onResume!(props.currentSourceId!)}
+              theme="purple"
+              padding="md:px-12 p-2.5"
+              className="mt-6"
+            >
+              {t("player.playbackError.resumeButton")}
+            </Button>
+          )}
           <Button
             onClick={handleOpenSourcePicker}
             theme="purple"

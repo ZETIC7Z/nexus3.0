@@ -32,6 +32,8 @@ export interface InterfaceSlice {
     timeFormat: VideoPlayerTimeFormat; // Time format of the video player
     isSpeedBoosted: boolean; // is playback speed temporarily boosted to 2x
     showSpeedIndicator: boolean; // should the speed indicator be shown
+    showAutoFallbackPopout: boolean; // should the auto-fallback popout be shown
+    autoFallbackFailedSourceName: string | null; // human-readable name of the source being switched away from
   };
   updateInterfaceHovering(newState: PlayerHoverState): void;
   setSeeking(seeking: boolean): void;
@@ -44,6 +46,7 @@ export interface InterfaceSlice {
   setShouldStartFromBeginning(val: boolean): void;
   setSpeedBoosted(state: boolean): void;
   setShowSpeedIndicator(state: boolean): void;
+  setAutoFallbackPopout(state: boolean, failedSourceName?: string | null): void;
 }
 
 export const createInterfaceSlice: MakeSlice<InterfaceSlice> = (set, get) => ({
@@ -63,6 +66,8 @@ export const createInterfaceSlice: MakeSlice<InterfaceSlice> = (set, get) => ({
     shouldStartFromBeginning: false,
     isSpeedBoosted: false,
     showSpeedIndicator: false,
+    showAutoFallbackPopout: false,
+    autoFallbackFailedSourceName: null,
   },
 
   setShouldStartFromBeginning(val) {
@@ -122,6 +127,14 @@ export const createInterfaceSlice: MakeSlice<InterfaceSlice> = (set, get) => ({
   setShowSpeedIndicator(state) {
     set((s) => {
       s.interface.showSpeedIndicator = state;
+    });
+  },
+  setAutoFallbackPopout(state, failedSourceName = null) {
+    set((s) => {
+      s.interface.showAutoFallbackPopout = state;
+      s.interface.autoFallbackFailedSourceName = state
+        ? failedSourceName
+        : null;
     });
   },
 });
