@@ -136,11 +136,30 @@ export default async function handler(req, res) {
     // The VPS api.py has a /api/proxy endpoint that adds required CDN headers
     // (Referer, Origin, User-Agent) and handles Range streaming properly.
     const targetUrl = `${upstreamBase}/${path}${query.toString() ? `?${query}` : ""}`;
-    const upstream = await fetch(targetUrl, {
-      method,
-      headers,
-    });
-    res.status(upstream.status);
+
+    // The VPS rate-limits burst requests (429) and occasionally drops a
+    // connection (502/503/504). Retry with short backoff so a single user
+    // opening a title still gets a stream instead of a spinner.
+    let upstream;
+    let lastStatus = 0;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      upstream = await fetch(targetUrl, {
+        method,
+        headers,
+      });
+      lastStatus = upstream.status;
+      const retriable =
+        upstream.status === 429 ||
+        upstream.status === 502 ||
+        upstream.status === 503 ||
+        upstream.status === 504;
+      if (!retriable || attempt === 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+      // drain + discard the failed response body before retrying
+      await upstream.arrayBuffer().catch(() => {});
+    }
+
+    res.status(lastStatus);
     copyResponseHeaders(upstream, res);
     if (method === "HEAD") {
       res.send("");
