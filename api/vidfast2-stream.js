@@ -32,10 +32,8 @@ function isAllowedMediaUrl(value) {
     if (parsed.protocol !== "https:") return false;
     const hosts = allowedMediaHosts();
     const host = parsed.hostname.toLowerCase();
-    return (
-      hosts.has(host) ||
-      hosts.has(host.replace(/^[^.]+\./, "")) // allow subdomains of listed roots
-    );
+    // Exact match OR proper subdomain of a listed root (any depth).
+    return [...hosts].some((root) => host === root || host.endsWith(`.${root}`));
   } catch {
     return false;
   }
@@ -49,6 +47,8 @@ function makeProxyUrl(url, kind, queryHeaders) {
 
 function rewriteUriAttribute(line, baseUrl, queryHeaders) {
   return line.replace(/URI="([^"]*)"/g, (match, uri) => {
+    // data: URIs (EXT-X-MAP init segments) must not be proxied.
+    if (uri.startsWith("data:")) return match;
     try {
       const resolved = new URL(uri, baseUrl).toString();
       return `URI="${makeProxyUrl(resolved, "m3u8-proxy", queryHeaders)}"`;
