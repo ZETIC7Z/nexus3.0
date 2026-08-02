@@ -12,17 +12,48 @@ const BROWSER_UA =
 
 const ALLOWED_PATHS = new Set(["m3u8-proxy", "ts-proxy"]);
 
-// Only relay CDN traffic from the known VidFast2 media hosts. This prevents
-// the endpoint being used as an open proxy/SSRF vector while keeping playback
-// working. Configurable via VIDFAST2_MEDIA_HOSTS (comma-separated).
-function allowedMediaHosts() {
-  return new Set(
-    (process.env.VIDFAST2_MEDIA_HOSTS ??
-      "moon.ironwallnet.net,ironwallnet.net")
-      .split(",")
-      .map((host) => host.trim().toLowerCase())
-      .filter(Boolean),
-  );
+// SSRF guard: VidFast2's CDN rotates hosts per stream (moon.ironwallnet.net,
+// housestrong.site, ...), so a fixed allowlist would break playback. Instead
+// reject anything that could target internal infrastructure: non-https,
+// userinfo credentials, localhost, private/loopback/link-local/metadata IPs.
+function isSuspiciousHost(hostname) {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  // Decimal / hex IP literals (e.g. 2130706433 → 127.0.0.1).
+  if (/^\d+$/.test(h) || /^0x/i.test(h)) return true;
+  let ip = h.replace(/^\[|\]$/g, ""); // strip IPv6 brackets
+
+  // IPv4-mapped IPv6 (::ffff:127.0.0.1) → unwrap and check as IPv4.
+  if (ip.startsWith("::ffff:")) ip = ip.slice(7);
+
+  const octets = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (octets) {
+    const a = Number(octets[1]);
+    const b = Number(octets[2]);
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 169 && b === 254) return true; // link-local incl. 169.254.169.254
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+    if (a >= 224) return true; // multicast / reserved
+    return false;
+  }
+
+  // IPv6 literals only (hostnames never contain ":").
+  if (ip.includes(":")) {
+    if (
+      ip === "::" ||
+      ip.startsWith("::1") ||
+      ip.startsWith("fe80:") ||
+      ip.startsWith("fc") ||
+      ip.startsWith("fd") ||
+      ip.startsWith("ff") ||
+      ip.startsWith("2001:db8:")
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isAllowedMediaUrl(value) {
@@ -30,10 +61,8 @@ function isAllowedMediaUrl(value) {
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== "https:") return false;
-    const hosts = allowedMediaHosts();
-    const host = parsed.hostname.toLowerCase();
-    // Exact match OR proper subdomain of a listed root (any depth).
-    return [...hosts].some((root) => host === root || host.endsWith(`.${root}`));
+    if (parsed.username || parsed.password) return false;
+    return !isSuspiciousHost(parsed.hostname);
   } catch {
     return false;
   }
@@ -120,7 +149,24 @@ export default async function handler(req, res) {
 
   try {
     const method = (req.method || "GET").toUpperCase();
-    const upstream = await fetch(streamUrl, { method, headers });
+
+    // Follow redirects manually so every hop is re-validated against the
+    // SSRF guard (CDNs redirect signed URLs to storage).
+    let upstream = null;
+    let currentUrl = streamUrl;
+    for (let hop = 0; hop < 5; hop += 1) {
+      upstream = await fetch(currentUrl, { method, headers, redirect: "manual" });
+      if (![301, 302, 303, 307, 308].includes(upstream.status)) break;
+      const location = upstream.headers.get("location");
+      const next = location ? new URL(location, currentUrl).toString() : null;
+      await upstream.arrayBuffer().catch(() => {}); // drain
+      if (!next || !isAllowedMediaUrl(next)) {
+        upstream = new Response("Forbidden", { status: 403 });
+        break;
+      }
+      currentUrl = next;
+    }
+
     res.status(upstream.status);
     const ct = upstream.headers.get("content-type") || "";
     if (ct) res.setHeader("Content-Type", ct);
