@@ -68,7 +68,7 @@ export {
  */
 export const embedsSourceProvider = makeProviderContext({
   id: "nexus-embeds",
-  name: "Embeds ⚡",
+  name: "Embeds",
   rank: 1320,
   disabled: false,
   async scrape(ctx: any) {

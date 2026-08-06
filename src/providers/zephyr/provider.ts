@@ -243,7 +243,7 @@ getRouteConfig().catch(() => { /* best-effort; first scrape will retry */ });
 // ---------------------------------------------------------------------------
 export const vidfast2Provider = makeProviderContext({
   id: "nexus-vidfast2",
-  name: "Zephyr 🔥",
+  name: "Zephyr",
   rank: 1330,
   disabled: false,
   async scrape(ctx) {
