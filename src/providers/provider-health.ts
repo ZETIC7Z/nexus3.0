@@ -2,8 +2,6 @@
 // NEXUS — Provider Health & Probe System
 // ---------------------------------------------------------------------------
 
-import { getProxiedUrl } from "./proxiedFetch";
-
 export interface ProviderHealth {
   id: string;
   name: string;
@@ -17,24 +15,16 @@ const HEALTH_TTL = 5 * 60 * 1000;
 const healthCache = new Map<string, ProviderHealth>();
 
 function probeUrlFor(id: string): string | null {
-  const mb = "/api/moviebox";
-  const hf = "https://stycanine1-tmdb-embed-api.hf.space";
-
   switch (id) {
-    case "nexus-moviebox":
-      return `${mb}/search?q=one`;
-    case "nexus-notorrent":
-    case "nexus-vidfast":
-    case "nexus-vidup":
-      return `${hf}/api/streams/${id.replace("nexus-", "")}/movie/603`;
     case "nexus-vidfast2":
       // Probe the CF Worker's /vc-proxy endpoint — the worker forwards to
       // vidfast.vc with proper headers from Cloudflare's own edge, so it
       // works on all platforms (Vercel, local dev, any browser).
       return "https://vidfast.samxerz-zeticuz.workers.dev/vc-proxy?path=movie/603";
-    case "nexus-anikai":
-    case "nexus-anikoto":
-      return `${hf}/api/streams/${id.replace("nexus-", "")}/series/37854?season=1&episode=1`;
+    case "nexus-embeds":
+      // Light liveness probe on the TMDB-Embed space root (~1s vs a 2-10s
+      // scrape). The space serves CORS `*`, so probe it directly.
+      return "https://stycanine1-tmdb-embed-api.hf.space/";
     default:
       return null;
   }
@@ -57,14 +47,10 @@ async function probeOne(id: string, name: string): Promise<ProviderHealth> {
   const t = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
   let healthy = false;
   try {
-    // The HF Space explicitly allows browser CORS. Probe it directly so a
-    // flaky user-configured CORS proxy cannot hide otherwise working sources.
-    const probeTarget =
-      url.startsWith("/") ||
-      url.startsWith("https://stycanine1-tmdb-embed-api.hf.space/")
-        ? url
-        : getProxiedUrl(url);
-    const res = await fetch(probeTarget, { signal: ctrl.signal, method: "GET", mode: "cors" });
+    // Probe directly — both the CF Worker and the TMDB-Embed space serve
+    // CORS `*`, so a flaky user-configured CORS proxy can never hide a
+    // working provider.
+    const res = await fetch(url, { signal: ctrl.signal, method: "GET", mode: "cors" });
     healthy = res.status >= 200 && res.status < 400;
   } catch {
     healthy = false;

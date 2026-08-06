@@ -1,47 +1,35 @@
 // nexus-providers-index.ts
 // NEXUS — Provider Registry
 // ---------------------------------------------------------------------------
-// Movie / TV:  Zephyr → Nyxos → Astrix → Xylos → Setzu
-// Anime:       Nyxos → Vexis → Morvyn
+// Sources (shown in the player source list):
+//   1. Zephyr 🔥   — CF Worker + vidfast.vc (tried first)
+//   2. Embeds ⚡   — container for all TMDB-Embed providers (movie/TV + anime)
+//
+// Embeds (inside "Embeds ⚡"):
+//   Movie/TV: VidLink, NoTorrent, Videasy, VixSrc, VidCore, VidUp, VidFast
+//   Anime:     AniKoto, AniKai
 // ---------------------------------------------------------------------------
-// VidUp2/VidCore2 are intentionally not registered because their worker
-// route-config endpoints are persistently rate-limited.
 
-import { movieboxProvider } from "./moviebox-provider";
+import { vidfast2Provider } from "./zephyr/provider";
 import {
-  notorrentProvider,
-  vidfastProvider,
-  vidupProvider,
-  anikaiProvider,
-  anikotoProvider,
-} from "./tmdb-embed-provider";
-import { vidfast2Provider } from "./vidfast2-provider";
+  embedsSourceProvider,
+  nexusEmbedProviders,
+} from "./embeds";
 import { getHealthyProviders, type ProbeableProvider } from "./provider-health";
 
-// Ordered by rank (highest first).
-// Movie / TV:  Zephyr → Nyxos → Astrix → Xylos → Setzu
-// Anime:       Vexis → Morvyn
+// Ordered by rank (highest first). Zephyr is tried before Embeds.
 export const nexusCustomProviders = [
   vidfast2Provider,      // 1330 — Zephyr (CF Worker + vidfast.vc, works everywhere)
-  movieboxProvider,      // 1320 — Nyxos (self-hosted VPS, MP4 + multi-audio dubs)
-  notorrentProvider,     // 1280 — Astrix (Stremio addon, movie+TV, 8-11 streams)
-  vidupProvider,         // 1252 — Xylos (vidup.to, movie+TV)
-  vidfastProvider,       // 1240 — Setzu (vidfast.vc, movie+TV)
-  anikaiProvider,        // 1250 — Vexis (anime, via TMDB-Embed API)
-  anikotoProvider,       // 1240 — Morvyn (anime, via TMDB-Embed API, dub support)
+  embedsSourceProvider,  // 1320 — Embeds ⚡ (TMDB-Embed provider family)
 ] as const;
 
-export const nexusCustomEmbeds = [] as const;
+export const nexusCustomEmbeds = nexusEmbedProviders;
 
+export { vidfast2Provider } from "./zephyr/provider";
 export {
-  notorrentProvider,
-  vidfastProvider,
-  vidfast2Provider,
-  vidupProvider,
-  movieboxProvider,
-  anikaiProvider,
-  anikotoProvider,
-};
+  embedsSourceProvider,
+  nexusEmbedProviders,
+} from "./embeds";
 
 export { getHealthyProviders, getHealthSnapshot, invalidateHealth } from "./provider-health";
 export type { ProviderHealth } from "./provider-health";

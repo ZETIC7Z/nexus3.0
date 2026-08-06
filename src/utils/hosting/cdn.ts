@@ -30,12 +30,21 @@ export function processCdnLink(url: string): string {
       const isMovieBoxDomain = 
         parsedUrl.hostname.endsWith("hakunaymatata.com") || 
         parsedUrl.hostname.endsWith("aoneroom.com");
+      // TMDB-Embed stream URLs are ALREADY proxied (m3u8-proxy / ts-proxy on
+      // the embed backend, which rewrites every segment and serves CORS `*`).
+      // Wrapping them in the destination proxy would add a pointless hop, so
+      // let them play straight like the moviebox domains.
+      const isAlreadyProxiedEmbedUrl =
+        processedUrl.includes("/m3u8-proxy?url=") ||
+        processedUrl.includes("/ts-proxy?url=") ||
+        parsedUrl.hostname.endsWith("stycanine1-tmdb-embed-api.hf.space");
 
       if (
         parsedUrl.origin !== currentOrigin &&
         !parsedUrl.hostname.includes("localhost") &&
         !parsedUrl.hostname.includes("127.0.0.1") &&
-        !isMovieBoxDomain
+        !isMovieBoxDomain &&
+        !isAlreadyProxiedEmbedUrl
       ) {
         const proxyBase = getLoadbalancedProxyUrl();
         if (proxyBase) {

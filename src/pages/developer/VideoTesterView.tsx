@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
+import {
+  EMBED_API_BASE,
+  fetchAndRankEmbed,
+  isHlsItem,
+  type RankedStream,
+} from "@/providers/embeds";
 import { prepareStream } from "@/backend/extension/streams";
 import { Button } from "@/components/buttons/Button";
 import { Toggle } from "@/components/buttons/Toggle";
@@ -35,6 +41,19 @@ const streamTypes: Record<StreamType, string> = {
   mp4: "MP4",
 };
 
+// TMDB-Embed provider list for the dev tester (mirrors src/providers/embeds)
+const DEV_EMBED_PROVIDERS = [
+  { id: "vidlink", name: "VidLink 🎬" },
+  { id: "notorrent", name: "NoTorrent 🧲" },
+  { id: "videasy", name: "Videasy 🎥" },
+  { id: "vixsrc", name: "VixSrc 🔗" },
+  { id: "vidcore", name: "VidCore 💎" },
+  { id: "vidup", name: "VidUp ⬆️" },
+  { id: "vidfast", name: "VidFast ⚡" },
+  { id: "anikoto", name: "AniKoto 👺" },
+  { id: "anikai", name: "AniKai 🥷" },
+];
+
 export default function VideoTesterView() {
   const { status, playMedia, setMeta, reset } = usePlayer();
   const [selected, setSelected] = useState("mp4");
@@ -45,6 +64,19 @@ export default function VideoTesterView() {
   const [headers, setHeaders] = useState<Array<{ key: string; value: string }>>(
     [{ key: "", value: "" }],
   );
+
+  // ── Embed tester state ────────────────────────────────────────────────
+  const [embedProvider, setEmbedProvider] = useState("vidlink");
+  const [embedTmdbId, setEmbedTmdbId] = useState("900");
+  const [embedIsSeries, setEmbedIsSeries] = useState(false);
+  const [embedSeason, setEmbedSeason] = useState("1");
+  const [embedEpisode, setEmbedEpisode] = useState("1");
+  const [embedRawUrl, setEmbedRawUrl] = useState("");
+  const [embedResults, setEmbedResults] = useState<
+    Array<{ name: string; quality: string; latency: number | null; url: string; hls: boolean }>
+  >([]);
+  const [embedLoading, setEmbedLoading] = useState(false);
+  const [embedError, setEmbedError] = useState<string | null>(null);
 
   // Check extension state on mount
   useEffect(() => {
@@ -78,6 +110,47 @@ export default function VideoTesterView() {
       setHeaders([{ key: "", value: "" }]);
     }
   }, [headersEnabled]);
+
+  // Build the TMDB-Embed API endpoint for the current tester inputs.
+  const buildEmbedEndpoint = useCallback((): string => {
+    const type = embedIsSeries ? "series" : "movie";
+    let url = `${EMBED_API_BASE}/api/streams/${embedProvider}/${type}/${encodeURIComponent(embedTmdbId)}`;
+    if (embedIsSeries) {
+      url += `?season=${encodeURIComponent(embedSeason)}&episode=${encodeURIComponent(embedEpisode)}`;
+    }
+    return url;
+  }, [embedProvider, embedTmdbId, embedIsSeries, embedSeason, embedEpisode]);
+
+  // Fetch + rank every server for the current endpoint.
+  const fetchEmbedList = useCallback(
+    async (endpoint?: string) => {
+      const target = endpoint || embedRawUrl || buildEmbedEndpoint();
+      if (!target) return;
+      setEmbedLoading(true);
+      setEmbedError(null);
+      try {
+        const ranked: RankedStream[] = await fetchAndRankEmbed(target);
+        setEmbedResults(
+          ranked.map((r) => ({
+            name:
+              r.item.name || r.item.server || r.item.title || r.item.provider || "Stream",
+            quality: r.quality,
+            latency: r.latency,
+            url: r.item.url,
+            hls: isHlsItem(r.item),
+          })),
+        );
+      } catch (err) {
+        setEmbedError(err instanceof Error ? err.message : "Fetch failed");
+        setEmbedResults([]);
+      } finally {
+        setEmbedLoading(false);
+      }
+    },
+    [embedRawUrl, buildEmbedEndpoint],
+  );
+
+
 
   const start = useCallback(
     async (url: string, type: StreamType) => {
@@ -140,6 +213,27 @@ export default function VideoTesterView() {
     },
     [playMedia, setMeta, headersEnabled, headers, extensionState],
   );
+
+  // Play the best (first ranked) stream directly in the player.
+  const playBestEmbed = useCallback(async () => {
+    const target = embedRawUrl || buildEmbedEndpoint();
+    if (!target) return;
+    setEmbedLoading(true);
+    setEmbedError(null);
+    try {
+      const ranked = await fetchAndRankEmbed(target);
+      const best = ranked.find((r) => r.latency !== null) ?? ranked[0];
+      if (!best) {
+        setEmbedError("No playable stream found");
+        return;
+      }
+      await start(best.item.url, isHlsItem(best.item) ? "hls" : "mp4");
+    } catch (err) {
+      setEmbedError(err instanceof Error ? err.message : "Fetch failed");
+    } finally {
+      setEmbedLoading(false);
+    }
+  }, [embedRawUrl, buildEmbedEndpoint, start]);
 
   const startFromCli = useCallback(async () => {
     try {
@@ -354,6 +448,120 @@ export default function VideoTesterView() {
                   </Button>
                 </div>
               </div>
+            </div>
+
+            {/* ── Embed tester — test TMDB-Embed endpoints directly ── */}
+            <Divider marginClass="my-6 px-8 box-content -mx-8" />
+            <div className="flex-1">
+              <Title>Embed tester</Title>
+              <p className="text-type-secondary text-sm mb-3">
+                Fetch a TMDB-Embed endpoint, see every server with its quality
+                &amp; latency, and play any stream straight in the player.
+              </p>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
+                <Dropdown
+                  options={DEV_EMBED_PROVIDERS}
+                  selectedItem={
+                    DEV_EMBED_PROVIDERS.find((p) => p.id === embedProvider) ??
+                    DEV_EMBED_PROVIDERS[0]!
+                  }
+                  setSelectedItem={(item) => setEmbedProvider(item.id)}
+                />
+                <TextInputControl
+                  className="bg-video-context-flagBg rounded-md p-2 text-white w-full"
+                  value={embedTmdbId}
+                  onChange={setEmbedTmdbId}
+                  placeholder="TMDB ID (e.g. 900)"
+                />
+                <Button
+                  theme={embedIsSeries ? "purple" : "secondary"}
+                  onClick={() => setEmbedIsSeries((v) => !v)}
+                >
+                  {embedIsSeries ? "Series" : "Movie"}
+                </Button>
+                {embedIsSeries ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <TextInputControl
+                      className="bg-video-context-flagBg rounded-md p-2 text-white w-full"
+                      value={embedSeason}
+                      onChange={setEmbedSeason}
+                      placeholder="Season"
+                    />
+                    <TextInputControl
+                      className="bg-video-context-flagBg rounded-md p-2 text-white w-full"
+                      value={embedEpisode}
+                      onChange={setEmbedEpisode}
+                      placeholder="Episode"
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="my-2 text-xs text-type-secondary break-all">
+                {buildEmbedEndpoint()}
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                <Button onClick={playBestEmbed} disabled={embedLoading}>
+                  {embedLoading ? "Fetching…" : "Fetch best stream & play"}
+                </Button>
+                <Button
+                  theme="secondary"
+                  onClick={() => fetchEmbedList()}
+                  disabled={embedLoading}
+                >
+                  List all servers
+                </Button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-[1fr,auto] gap-2 items-center">
+                <TextInputControl
+                  className="bg-video-context-flagBg rounded-md p-2 text-white w-full"
+                  value={embedRawUrl}
+                  onChange={setEmbedRawUrl}
+                  placeholder="Or paste a full /api/streams/... endpoint URL"
+                />
+                <Button
+                  theme="secondary"
+                  onClick={() => fetchEmbedList(embedRawUrl)}
+                  disabled={embedLoading || !embedRawUrl}
+                >
+                  Fetch raw URL
+                </Button>
+              </div>
+
+              {embedError ? (
+                <p className="mt-3 text-red-400 text-sm break-all">
+                  {embedError}
+                </p>
+              ) : null}
+
+              {embedResults.length > 0 ? (
+                <div className="mt-4 space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {embedResults.map((r, i) => (
+                    // eslint-disable-next-line react/no-array-index-key
+                    <div
+                      key={`${r.url}-${i}`}
+                      className="flex items-center justify-between gap-3 bg-video-context-flagBg rounded-md px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-white text-sm truncate">{r.name}</p>
+                        <p className="text-xs text-type-secondary">
+                          {r.quality} · {r.hls ? "HLS" : "MP4"} ·{" "}
+                          {r.latency !== null ? `${r.latency}ms` : "no response"}
+                        </p>
+                      </div>
+                      <Button
+                        theme={r.latency !== null ? "purple" : "secondary"}
+                        onClick={() => start(r.url, r.hls ? "hls" : "mp4")}
+                      >
+                        Play
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

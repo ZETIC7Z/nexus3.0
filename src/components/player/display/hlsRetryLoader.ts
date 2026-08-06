@@ -67,15 +67,32 @@ const MAX_RETRIES = 12;
 const BASE_DELAY = 250;
 const MAX_DELAY = 3000;
 
+// The TMDB-Embed backend rewrites every HLS segment to its own /ts-proxy and
+// serves CORS `*`, so those URLs are already playable straight — wrapping
+// them in the generic destination proxy breaks playback.
+function isAlreadyProxiedHlsUrl(url: string): boolean {
+  if (!url) return false;
+  if (url.includes("m3u8-proxy") || url.includes("ts-proxy")) return true;
+  try {
+    return new URL(url).hostname.endsWith("stycanine1-tmdb-embed-api.hf.space");
+  } catch {
+    return false;
+  }
+}
+
 export class ArtemisRetryLoader extends DefaultLoader {
   private _retryTimer?: ReturnType<typeof setTimeout>;
 
   load(context: any, config: any, callbacks: any): void {
     let url: string = context?.url ?? "";
 
-    if (!isExtensionActiveCached() && !isEncryptedSiteSegmentProxy(url)) {
+    if (
+      !isExtensionActiveCached() &&
+      !isEncryptedSiteSegmentProxy(url) &&
+      !isAlreadyProxiedHlsUrl(url)
+    ) {
       const proxyBase = getLoadbalancedProxyUrl();
-      if (proxyBase && url && !url.includes("destination=") && !url.includes("m3u8-proxy")) {
+      if (proxyBase && url && !url.includes("destination=")) {
         context.url = `${proxyBase}?destination=${encodeURIComponent(url)}`;
         url = context.url;
       }

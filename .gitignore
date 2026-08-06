@@ -32,3 +32,4 @@ sync-fork.bat
 
 .vercel
 .env*
+.freebuff/
