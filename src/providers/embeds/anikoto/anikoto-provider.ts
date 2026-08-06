@@ -7,7 +7,7 @@ import { makeEmbedProvider } from "../shared";
 
 export const anikotoEmbedProvider = makeEmbedProvider({
   id: "nexus-embed-anikoto",
-  name: "AniKoto 👺",
+  name: "Embeds / AniKoto",
   rank: 900,
   backend: "anikoto",
   anime: true,

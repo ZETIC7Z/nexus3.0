@@ -7,7 +7,7 @@ import { makeEmbedProvider } from "../shared";
 
 export const anikaiEmbedProvider = makeEmbedProvider({
   id: "nexus-embed-anikai",
-  name: "AniKai 🥷",
+  name: "Embeds / AniKai",
   rank: 890,
   backend: "anikai",
   anime: true,

@@ -182,7 +182,9 @@ export function useSourceScraping(sourceId: string | null, routerId: string) {
       router.close();
       return null;
     }
-    if (result.embeds.length === 1) {
+    // Auto-scrape the first (best-ranked) embed — the runner will
+    // fail over to the next one automatically if this one errors.
+    if (result.embeds.length >= 1) {
       let embedResult: EmbedOutput | undefined;
       if (!meta) return;
       try {

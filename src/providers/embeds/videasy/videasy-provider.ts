@@ -5,7 +5,7 @@ import { makeEmbedProvider } from "../shared";
 
 export const videasyEmbedProvider = makeEmbedProvider({
   id: "nexus-embed-videasy",
-  name: "Videasy 🎥",
+  name: "Embeds / Videasy",
   rank: 950,
   backend: "videasy",
 });
