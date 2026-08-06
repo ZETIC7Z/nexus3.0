@@ -18,9 +18,10 @@ export function makeProviderContext(options: ProviderContextOptions) {
       streams = [streams];
     }
 
+    // Empty [] is truthy in JS — would crash player on result.stream[0].captions
     return {
       embeds: result.embeds || [],
-      stream: streams,
+      stream: streams?.length ? streams : undefined,
     };
   };
 
@@ -59,9 +60,10 @@ export function makeEmbedContext(options: EmbedContextOptions) {
       streams = [streams];
     }
 
+    // Empty [] is truthy in JS — would crash player on result.stream[0].captions
     return {
       embeds: result.embeds || [],
-      stream: streams,
+      stream: streams?.length ? streams : undefined,
     };
   };
 

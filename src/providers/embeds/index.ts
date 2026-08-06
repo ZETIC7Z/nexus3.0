@@ -84,7 +84,6 @@ export const embedsSourceProvider = makeProviderContext({
         embedId: p.id,
         url: buildEmbedUrl(p.backend ?? p.id, ctx),
       })),
-      stream: [],
     };
   },
 });
