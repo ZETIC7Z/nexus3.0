@@ -7,6 +7,7 @@ import {
   selectUnreadCount,
   selectNotifications,
   initNotifications,
+  announceV3Changelog,
   type NexusNotification,
 } from "@/utils/notifications";
 
@@ -49,6 +50,8 @@ export function useNotifications(): UseNotificationsReturn {
 export function useNotificationInit(): void {
   useEffect(() => {
     const cleanup = initNotifications();
+    // Show v3.0 changelog on first launch after update
+    announceV3Changelog();
     return cleanup;
   }, []);
 }

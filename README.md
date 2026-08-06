@@ -11,73 +11,99 @@
 
 ---
 
+## 🚀 v3.0 — What's New
+
+### Flattened Provider Architecture
+Every provider is now shown individually in the source list — no more nested "Embeds" playlist. Each provider auto-probes its servers for latency and content validity, picking the fastest stable stream. Dead servers are silently skipped.
+
+### Country Top 10
+Automatically detects your country via `api.country.is` → `ipapi.co` → navigator locale and shows the **Top 10 most popular movies & TV shows in your country** on the Discover page. Conflix-style numbered SVG overlays behind each poster.
+
+### Kids Profile
+A dedicated Kids mode with content filtering. Activate a Kids profile and all browsing is restricted to kid-safe content only. Includes route guards (`KidsRouteGuard`, `MediaKidsGuard`) that block access to adult-rated media.
+
+### Profile Selection
+Choose from multiple avatars (including Conflix-style avatars) via the Profile Select screen. Profiles persist in local storage.
+
+### Smart Audio Tracks
+- **Movie/TV**: "🌐 Original" audio by default
+- **Anime**: "🇯🇵 Japanese" (original) + dub languages with country flags (🇬🇧 English, 🇪🇸 Spanish, 🇮🇳 Hindi, etc.)
+- **Subtitles**: Auto-enabled English by default — just hit play and captions appear
+
+### Auto-Update Notifications
+Polls GitHub releases every 6 hours. When a new version drops, you get an in-app notification with the release link.
+
+---
+
 ## Active Providers
 
-### Sources (tried in order by the auto-scrape runner)
+### Sources (tried in rank order — highest first)
 
-| Source | Priority | Backend | Type |
-|--------|----------|---------|------|
-| **Zephyr 🔥** | 1330 | CF Worker + vidfast.vc encryption | Movies, TV |
-| **Embeds ⚡** | 1320 | TMDB-Embed HF Space (7 providers inside) | Movies, TV, Anime |
+| Source | Rank | Backend | Type |
+|--------|------|---------|------|
+| **Zephyr** | 1330 | CF Worker + vidfast.vc encryption | Movies, TV |
+| **NoTorrent** | 970 | Stremio addon aggregator (up to 11 mirrors) | Movies, TV |
+| **VidCore** | 960 | Supreme/Prime servers via moon CDN | Movies, TV |
+| **Videasy** | 950 | — | Movies, TV |
+| **VidUp** | 940 | Moon CDN | Movies, TV |
+| **VidFast** | 930 | — | Movies, TV |
+| **AniKoto** | 900 | Dub support (multi-language audio tracks) | Anime |
+| **AniKai** | 890 | Sub streams | Anime |
 
-### Embeds ⚡ Providers (auto best-server selection per provider)
+### How Providers Work
 
-| Provider | Rank | Type | Notes |
-|----------|------|------|-------|
-| **NoTorrent** | 970 | Movies, TV | Stremio addon aggregator, up to 11 mirrors |
-| **VidCore** | 960 | Movies, TV | Supreme/Prime servers via moon CDN |
-| **Videasy** | 950 | Movies, TV | — |
-| **VidUp** | 940 | Movies, TV | Moon CDN works for series |
-| **VidFast** | 930 | Movies, TV | — |
-| **AniKoto** | 900 | Anime | Dub support (multi-language audio tracks) |
-| **AniKai** | 890 | Anime | Sub streams |
-
-### How Embeds ⚡ Works
-
-1. The "Embeds ⚡" source builds API URLs for each provider based on the current media (movie/TV/anime)
-2. The movie-web runner tries each embed in **rank order** (highest first)
-3. Each embed calls its TMDB-Embed API endpoint, then **probes every returned server URL** for real latency + content validity
-4. Dead servers (geo-blocked CDNs, "Wrong IP" HTML pages, 403/429) are filtered out
-5. Working servers are ranked by **quality tier** then **latency** — fastest stable stream wins
-6. Anime providers separate sub/dub streams — dubs become selectable Audio tracks
-7. All stream URLs come **pre-proxied** through the HF space (`/m3u8-proxy` and `/ts-proxy`) — the player plays them directly, no additional wrapping needed
+1. Each source calls the TMDB-Embed API: `https://stycanine1-tmdb-embed-api.hf.space/api/streams/{provider}/movie/{tmdbId}`
+2. Returns multiple server mirrors with quality metadata
+3. Every server URL is **latency-probed** in parallel — content-aware validation catches "Wrong IP" HTML errors, 403/429 blocks, and S3 XML denials
+4. Working servers ranked by **quality** (4K > 1080 > 720...) then **latency** (fastest wins)
+5. User sees **numbered servers** (Server 1, Server 2, ...) and can pick manually
+6. If all servers fail → runner automatically tries the **next provider** in the list
+7. Error shown only when **every provider** is exhausted
+8. Anime providers split sub/dub — dubs appear as Audio track options with flags
 
 ### Removed Providers
 
 | Provider | Reason |
 |----------|--------|
-| **VidLink** | CDN (`bcdnxw.hakunaymatata.com`) consistently geo-blocked through HF proxy (429 on every stream) |
-| **VixSrc** | CDN (`vixsrc.to`) consistently geo-blocked through HF proxy (403 on every stream) |
-| **Nyxos (MovieBox)** | Self-hosted VPS — removed to keep frontend-only deployment |
+| **VidLink** | CDN (`bcdnxw.hakunaymatata.com`) geo-blocked (429 on every stream) |
+| **VixSrc** | CDN (`vixsrc.to`) geo-blocked (403 on every stream) |
+| **Nyxos / MovieBox** | Required self-hosted VPS — removed for frontend-only deployment |
+| **Strix / Xylos / Vexis / Morvyn** | Consolidated into the unified TMDB-Embed API |
+
+---
 
 ## Features
 
-- **8 Total Sources** — Zephyr + 7 Embeds providers with automatic failover
-- **Smart Server Selection** — Real latency probing + content validation per stream
-- **Multi-Audio Dubs** — Anime supports original + dub language switching
-- **4K Quality Detection** — Quality normalization from stream metadata
-- **Subtitle Passthrough** — API subtitles forwarded to player captions
-- **No Ads** — Clean, ad-free streaming experience
-- **No Sign-Up Required** — Start watching instantly
-- **PWA Support** — Install as a native app on any device
-- **Watch Party** — Sync playback with friends in real-time
-- **Responsive Design** — Works on desktop, tablet, and mobile
+| Feature | Description |
+|---------|-------------|
+| **8 Flat Sources** | Zephyr + 7 individual providers, no nested playlists |
+| **Server Selection** | Numbered servers per provider — click to see mirrors, not auto-try |
+| **Server Failover** | Dead server → next server → next provider → error only at end |
+| **Latency Probing** | Real HTTP probe with content validation per stream URL |
+| **Multi-Audio Dubs** | Anime: Japanese original + 🇬🇧 🇪🇸 🇫🇷 🇩🇪 🇮🇳 dubs with flags |
+| **Auto Subtitles** | English subtitles enabled by default (subtitle store: `enabled: true`, `lastSelectedLanguage: "en"`) |
+| **Subtitle Passthrough** | API subtitles forwarded directly to player captions |
+| **4K Quality** | Quality detection + ranking: 4K > 1080p > 720p > 480p > 360p |
+| **Country Top 10** | `api.country.is` → `ipapi.co` → navigator locale detection chain |
+| **Kids Profile** | KidsPage + KidsRouteGuard + MediaKidsGuard for safe browsing |
+| **Profile Selection** | AvatarPicker, ConflixAvatar, multiple profile support |
+| **Update Notifications** | GitHub release polling every 6 hours |
+| **No Ads** | Clean, ad-free streaming |
+| **No Sign-Up** | Start watching instantly |
+| **PWA Support** | Install as native app on any device |
+| **Watch Party** | Sync playback with friends in real-time |
+| **Responsive** | Desktop, tablet, and mobile |
+
+---
 
 ## Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/ZETIC7Z/nexus3.0.git
 cd nexus3.0
-
-# Install dependencies
 pnpm install
-
-# Copy and fill in environment variables
 cp example.env .env
-# → Fill in TMDB_READ_API_KEY in .env
-
-# Start development server
+# → Fill in VITE_TMDB_READ_API_KEY in .env
 pnpm run dev
 # → http://localhost:5173
 ```
@@ -93,56 +119,65 @@ pnpm run dev
 
 | Variable | Value |
 |----------|-------|
-| `TMDB_READ_API_KEY` | Your TMDB v4 read token |
+| `VITE_TMDB_READ_API_KEY` | Your TMDB v4 read token |
 | `VITE_TMDB_EMBED_URL` | `https://stycanine1-tmdb-embed-api.hf.space` |
 | `VITE_APP_DOMAIN` | Your Vercel domain |
 | `VITE_NORMAL_ROUTER` | `true` |
 | `VITE_PWA_ENABLED` | `true` |
 | `VITE_ALLOW_AUTOPLAY` | `true` |
+| `VITE_CORS_PROXY_URL` | (optional) Your CORS proxy |
+| `VITE_M3U8_PROXY_URL` | (optional) Your M3U8 proxy |
+
+---
 
 ## How to Add a New Provider
 
-### Adding a TMDB-Embed provider
+### Adding a TMDB-Embed Provider
 
-1. Verify the provider exists on the TMDB-Embed API:
+1. **Verify** the provider exists:
    ```bash
    curl "https://stycanine1-tmdb-embed-api.hf.space/api/streams/{PROVIDER}/movie/603"
    ```
 
-2. Create a new folder: `src/providers/embeds/{provider}/`
-
-3. Create `{provider}-provider.ts`:
+2. **Create** the provider file in `src/providers/embeds/{provider}/{provider}-provider.ts`:
    ```ts
    import { makeEmbedProvider } from "../shared";
 
    export const newProvider = makeEmbedProvider({
      id: "nexus-embed-newprovider",
-     name: "NewProvider 🆕",
-     rank: 920,       // lower = tried later (Zephyr=1330, NoTorrent=970)
+     name: "NewProvider",
+     rank: 920,
      backend: "newprovider",
-     anime: false,    // true for anime-only providers
+     anime: false,
    });
    ```
 
-4. Register in `src/providers/embeds/index.ts`:
-   - Import the provider
-   - Add to `nexusEmbedProviders` array (ordered by rank, highest first)
-   - Add to the exports
+3. **Register** in `src/providers/nexus-providers-index.ts`:
+   - Add `makeStandaloneSource(...)` for a flattened source (or use `makeEmbedProvider` for sub-embeds)
+   - Add to `nexusCustomProviders` array
 
-5. The provider will automatically get:
+4. The provider automatically gets:
    - API fetching (`buildEmbedUrl` generates the endpoint)
-   - Latency probing (content-aware — catches "Wrong IP" HTML errors)
-   - Quality ranking
+   - Latency probing with content-aware validation
+   - Quality ranking (4K → 1080 → 720 → 480 → 360)
    - Best-server selection
    - Subtitle passthrough
+   - Audio tracks with flags (anime: Japanese + dubs)
 
-### Troubleshooting a Dead Provider
+### Troubleshooting
 
-If a provider stops working:
-1. Test the API directly: `curl "https://stycanine1-tmdb-embed-api.hf.space/api/streams/{provider}/movie/603"`
-2. Check the stream URLs: probe each URL — look for 403, 429, or "Wrong IP" HTML responses
-3. If all streams are dead → set `disabled: true` or remove from array
-4. If only some servers are dead → the content-aware probe handles this automatically
+```bash
+# Test a provider's API directly
+curl "https://stycanine1-tmdb-embed-api.hf.space/api/streams/vidcore/movie/603"
+
+# Test a stream URL (check for 403/429/HTML error pages)
+curl -I "https://..."
+```
+
+If all streams dead → set `disabled: true` or remove from array.
+If only some servers dead → the content-aware probe filters them automatically.
+
+---
 
 ## Tech Stack
 
@@ -151,30 +186,84 @@ If a provider stops working:
 | **Frontend** | React 18 + TypeScript + Vite |
 | **Styling** | Tailwind CSS |
 | **Player** | hls.js (HLS), native `<video>` (MP4) |
-| **State** | Zustand |
-| **Providers** | Custom scrapers + `@nexus/providers` package |
-| **Backend API** | Vercel Serverless Functions (`api/`) |
-| **Stream Proxy** | HuggingFace Space (`/m3u8-proxy`, `/ts-proxy`) |
-| **Encryption** | Cloudflare Worker (Zephyr's `vidfast.samxerz-zeticuz.workers.dev`) |
+| **State** | Zustand (persisted stores) |
+| **Provider Framework** | `@nexus/providers` package |
+| **Stream API** | TMDB-Embed HuggingFace Space (`stycanine1-tmdb-embed-api.hf.space`) |
+| **Stream Proxy** | `/m3u8-proxy` + `/ts-proxy` on HF Space |
+| **Encryption** | Cloudflare Worker (`vidfast.samxerz-zeticuz.workers.dev`) |
 | **Metadata** | TMDB API v4 |
 | **Subtitles** | OpenSubtitles, VDRK, Natsuki, FebBox, Wyzie |
+| **Country Detection** | `api.country.is` → `ipapi.co` → navigator locale |
+| **Notifications** | GitHub Releases API (6h polling) |
+
+---
 
 ## Project Structure
 
 ```
-src/providers/
-├── nexus-providers-index.ts   ← Registry: Zephyr + Embeds ⚡
-├── allowed-providers.ts       ← All sources allowed for all media
-├── provider-health.ts         ← Health probes (WF worker + HF root)
-├── shared/                    ← makeProviderContext, types
-├── zephyr/
-│   └── provider.ts            ← Zephyr 🔥 (CF Worker encryption)
-└── embeds/
-    ├── index.ts               ← "Embeds ⚡" source (anime-aware fan-out)
-    ├── shared.ts              ← API fetch, latency probe, quality ranking
-    ├── notorrent/  vidcore/   videasy/  vidup/  vidfast/
-    └── anikoto/    anikai/    ← Anime with dub support
+src/
+├── providers/
+│   ├── nexus-providers-index.ts   ← Registry: all 8 sources
+│   ├── allowed-providers.ts       ← Anime filtering (AniKoto/AniKai hidden for movies)
+│   ├── provider-health.ts         ← Health probes
+│   ├── shared/
+│   │   ├── makeProviderContext.ts ← Provider factory (stream: undefined on empty)
+│   │   └── types.ts
+│   ├── zephyr/
+│   │   └── provider.ts            ← Zephyr (CF Worker encryption)
+│   └── embeds/
+│       ├── shared.ts              ← API fetch, latency probe, quality, dubs, flags
+│       ├── notorrent/
+│       ├── vidcore/
+│       ├── videasy/
+│       ├── vidup/
+│       ├── vidfast/
+│       ├── anikoto/               ← Anime with dub support
+│       └── anikai/                ← Anime sub-only
+├── pages/
+│   ├── Kids.tsx                   ← Kids mode page
+│   ├── ProfileSelect.tsx          ← Profile picker
+│   ├── Apps.tsx                   ← Apps page
+│   └── discover/
+│       └── components/
+│           └── CountryPicksCarousel.tsx  ← Top 10 in your country
+├── stores/
+│   ├── profiles/                  ← Multi-profile state
+│   ├── ads/                       ← Ad state
+│   └── subtitles/                 ← Enabled: true, language: en by default
+├── components/
+│   ├── AvatarPicker.tsx           ← Avatar selection
+│   └── ConflixAvatar.tsx          ← Conflix-style avatar component
+└── utils/
+    ├── player/
+    │   └── audioTracks.ts         ← Audio track store + switchAudioTrack
+    ├── locale/
+    │   ├── detectRegion.tsx        ← Proxy region (ipapi.co)
+    │   ├── userRegion.ts          ← User country (navigator/timezone)
+    │   └── countryNames.ts        ← Country code → name map
+    └── notifications.ts           ← Update checker + toast notifications
 ```
+
+---
+
+## Changelog
+
+### v3.0 (Aug 2026)
+- **Flattened providers** — 8 individual sources, no Embeds wrapper
+- **Server selection** — numbered servers per provider with manual pick
+- **Server failover** — auto-try next server, next provider, error only at end
+- **Latency probing** — content-aware HTTP probe per stream URL
+- **Audio tracks** — 🌐 Original for movies, 🇯🇵 Japanese + flags for anime dubs
+- **Auto subtitles** — English enabled by default
+- **Country Top 10** — `api.country.is` → `ipapi.co` → navigator locale detection
+- **Kids Profile** — KidsPage, KidsRouteGuard, MediaKidsGuard
+- **Profile Selection** — AvatarPicker, ConflixAvatar, multi-profile support
+- **Dead providers removed** — VidLink (429), VixSrc (403), Nyxos/MovieBox, Strix, Xylos, Vexis, Morvyn
+- **Subtitle passthrough** — API captions forwarded through server embeds
+- **4K quality detection** — quality normalization from stream metadata
+- **GitHub backup** — `backup-providers` branch with pre-v3.0 state
+
+---
 
 ## Developer
 

@@ -270,6 +270,31 @@ export function notifyInfo(title: string, description: string, actionUrl?: strin
 }
 
 // ---------------------------------------------------------------------------
+// v3.0 Changelog — auto-posted on first launch after update
+// ---------------------------------------------------------------------------
+
+const V3_CHANGELOG_VERSION = "3.0.0";
+
+export function announceV3Changelog(): void {
+  const store = useNotificationStore.getState();
+  if (store.lastSeenVersion === V3_CHANGELOG_VERSION) return;
+  store.setLastSeenVersion(V3_CHANGELOG_VERSION);
+
+  store.addNotification({
+    type: "info",
+    title: "🎉 NEXUS 3.0 — Major Update",
+    description:
+      "8 flat sources with server selection. Country Top 10 on Discover. " +
+      "Kids profile with content filtering. Profile selection with avatars. " +
+      "Audio tracks with country flags. Auto English subtitles. " +
+      "Dead providers cleaned up: VidLink, VixSrc, Nyxos removed. " +
+      "Server failover — next server, next provider, error only at end.",
+    version: V3_CHANGELOG_VERSION,
+    autoDismissMs: 0,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Bootstrap — call this once in your app root
 // ---------------------------------------------------------------------------
 
