@@ -546,8 +546,52 @@ export function makeStandaloneSource(opts: {
     async scrape(ctx: any) {
       try {
         const apiUrl = buildEmbedUrl(backend, ctx);
-        if (anime) return await scrapeAnimeEmbed(backend, apiUrl, name);
-        return await scrapeMovieTvEmbed(backend, apiUrl, name);
+        const data = await fetchEmbedApi(apiUrl);
+        const items = data.streams ?? [];
+        if (items.length === 0) throw new NotFoundError(`${name}: no sources`);
+
+        const ranked = await rankStreams(items);
+        const usable = pickUsable(ranked);
+        if (usable.length === 0) {
+          throw new NotFoundError(`${name}: no working servers`);
+        }
+
+        // Separate subs and dubs for anime
+        const subs = anime ? usable.filter((r) => !isDubItem(r.item)) : usable;
+        const dubs = anime ? usable.filter((r) => isDubItem(r.item)) : [];
+        const mainPool = subs.length > 0 ? subs : usable;
+
+        if (anime && dubs.length > 0) {
+          // Return best sub as stream, dubs as audio tracks
+          const best = mainPool[0];
+          const captions = extractCaptions(best.item, `${id}-sub`);
+          const stream = isHlsItem(best.item)
+            ? buildHlsStream(best.item.url, `${id}-hls`, captions)
+            : buildFileStream({ [best.quality]: { type: "mp4", url: best.item.url } }, `${id}-file`, captions);
+
+          const audioTracks: any[] = [
+            { id: `${id}-audio-original`, label: "Original", language: "und", url: best.item.url, default: true },
+          ];
+          const seen = new Set<string>(["und"]);
+          for (const r of dubs) {
+            const { label: dl, language } = dubLanguage(r.item);
+            if (seen.has(language)) continue;
+            seen.add(language);
+            audioTracks.push({ id: `${id}-audio-${language}`, label: dl, language, url: r.item.url, default: false });
+          }
+          stream.audioTracks = audioTracks;
+          return { embeds: [], stream: [stream] };
+        }
+
+        // Return all working servers as embeds so user can pick
+        // First (fastest) auto-scrapes via useSourceScraping
+        return {
+          embeds: mainPool.map((r) => ({
+            embedId: "nexus-server",
+            url: r.item.url,
+          })),
+          stream: [],
+        };
       } catch (e: any) {
         console.error(`${name}:`, e?.message ?? e);
         throw e;

@@ -182,60 +182,44 @@ export function useSourceScraping(sourceId: string | null, routerId: string) {
       router.close();
       return null;
     }
-    // Auto-scrape the first (best-ranked) embed — the runner will
-    // fail over to the next one automatically if this one errors.
     if (result.embeds.length >= 1) {
-      let embedResult: EmbedOutput | undefined;
-      if (!meta) return;
-      try {
-        embedResult = await getProviders().runEmbedScraper({
-          id: result.embeds[0].embedId,
-          url: result.embeds[0].url,
-        });
-      } catch (err) {
-        console.error(`Failed to scrape ${result.embeds[0].embedId}`, err);
-        const notFound = err instanceof NotFoundError;
-        const status = notFound ? "notfound" : "failed";
-        report([
-          scrapeSourceOutputToProviderMetric(
-            meta,
-            sourceId,
-            result.embeds[0].embedId,
-            status,
-            err,
-          ),
-        ]);
-        throw err;
+      // Auto-try servers in order — failover to next if one fails
+      let lastErr: any;
+      for (const embed of result.embeds) {
+        try {
+          const embedResult = await getProviders().runEmbedScraper({
+            id: embed.embedId,
+            url: embed.url,
+          });
+          report([
+            scrapeSourceOutputToProviderMetric(meta, sourceId, embed.embedId, "success", null),
+          ]);
+          setSourceId(sourceId);
+          setEmbedId(embed.embedId);
+          setCaption(null);
+          if (isExtensionActiveCached()) await prepareStream(embedResult.stream[0]);
+          setSource(
+            convertRunoutputToSource({ stream: embedResult.stream[0] }),
+            convertProviderCaption(embedResult.stream[0].captions),
+            getSavedProgress(progressItems, meta),
+          );
+          const audioTracks = (embedResult.stream[0] as any).audioTracks;
+          if (audioTracks?.length) {
+            useAudioTrackStore.getState().setTracks(audioTracks);
+          } else {
+            useAudioTrackStore.getState().reset();
+          }
+          if (enableLastSuccessfulSource) setLastSuccessfulSource(sourceId);
+          router.close();
+          return null; // success — stop trying
+        } catch (err) {
+          lastErr = err;
+          console.error(`Server failed, trying next:`, (err as any)?.message);
+          // continue to next server
+        }
       }
-      report([
-        scrapeSourceOutputToProviderMetric(
-          meta,
-          sourceId,
-          result.embeds[0].embedId,
-          "success",
-          null,
-        ),
-      ]);
-      setSourceId(sourceId);
-      setEmbedId(result.embeds[0].embedId);
-      setCaption(null);
-      if (isExtensionActiveCached()) await prepareStream(embedResult.stream[0]);
-      setSource(
-        convertRunoutputToSource({ stream: embedResult.stream[0] }),
-        convertProviderCaption(embedResult.stream[0].captions),
-        getSavedProgress(progressItems, meta),
-      );
-      const audioTracks = (embedResult.stream[0] as any).audioTracks;
-      if (audioTracks?.length) {
-        useAudioTrackStore.getState().setTracks(audioTracks);
-      } else {
-        useAudioTrackStore.getState().reset();
-      }
-      // Save the last successful source when manually selected
-      if (enableLastSuccessfulSource) {
-        setLastSuccessfulSource(sourceId);
-      }
-      router.close();
+      // All servers failed — throw so runner tries next provider
+      throw lastErr || new NotFoundError("All servers failed");
     }
     return result.embeds;
   }, [

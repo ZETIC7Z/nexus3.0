@@ -58,8 +58,29 @@ export const nexusCustomProviders = [
   anikaiSource,      // 890  — AniKai (anime)
 ] as const;
 
-// No separate embeds — each provider is a standalone source.
-export const nexusCustomEmbeds: readonly any[] = [];
+// Simple pass-through embed for server URLs (already proxied)
+import { makeEmbedContext } from "./shared/makeProviderContext";
+import { flags } from "@nexus/providers";
+
+const serverEmbed = makeEmbedContext({
+  id: "nexus-server",
+  name: "Server",
+  rank: 999,
+  async scrape(ctx: any) {
+    const url = (ctx as any).url ?? "";
+    if (!url) throw new Error("No URL");
+    const isHls = url.includes(".m3u8") || url.includes("m3u8-proxy");
+    return {
+      embeds: [],
+      stream: [isHls
+        ? { id: "server-hls", type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions: [], headers: {}, skipValidation: true }
+        : { id: "server-mp4", type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions: [], headers: {}, skipValidation: true }
+      ],
+    };
+  },
+});
+
+export const nexusCustomEmbeds = [serverEmbed] as const;
 export { vidfast2Provider } from "./zephyr/provider";
 
 export { getHealthyProviders, getHealthSnapshot, invalidateHealth } from "./provider-health";
