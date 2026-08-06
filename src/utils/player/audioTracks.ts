@@ -6,7 +6,7 @@
 //   - switch language instantly, preserving currentTime + play state
 //
 // It's a small Zustand store + a helper that swaps the <video> source.
-// The provider (moviebox-provider.ts) attaches `audioTracks` to its stream.
+// The provider attaches `audioTracks` to its stream.
 // ---------------------------------------------------------------------------
 
 import { create } from "zustand";

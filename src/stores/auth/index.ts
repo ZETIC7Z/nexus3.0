@@ -7,6 +7,8 @@ export interface Account {
     colorA: string;
     colorB: string;
     icon: string;
+    /** Conflix-style image avatar (from the profile icon catalog). */
+    image?: string | null;
   };
   nickname: string;
 }

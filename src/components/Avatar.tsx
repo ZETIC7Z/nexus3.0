@@ -13,24 +13,43 @@ export interface AvatarProps {
   sizeClass?: string;
   iconClass?: string;
   bottom?: React.ReactNode;
+  /** Square tiles (profile picker) instead of circles. */
+  square?: boolean;
 }
 
 export function Avatar(props: AvatarProps) {
+  const profileImage = props.profile.image;
   return (
     <div className="relative inline-block">
       <div
         className={classNames(
           props.sizeClass,
-          "rounded-full overflow-hidden flex items-center justify-center text-white",
+          props.square
+            ? "rounded-[8px] overflow-hidden flex items-center justify-center text-white"
+            : "rounded-full overflow-hidden flex items-center justify-center text-white",
+          profileImage ? "bg-black/30" : "",
         )}
-        style={{
-          background: `linear-gradient(to bottom right, ${props.profile.colorA}, ${props.profile.colorB})`,
-        }}
+        style={
+          profileImage
+            ? undefined
+            : {
+                background: `linear-gradient(to bottom right, ${props.profile.colorA}, ${props.profile.colorB})`,
+              }
+        }
       >
-        <UserIcon
-          className={props.iconClass}
-          icon={props.profile.icon as any}
-        />
+        {profileImage ? (
+          <img
+            src={profileImage}
+            alt="avatar"
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          <UserIcon
+            className={props.iconClass}
+            icon={props.profile.icon as any}
+          />
+        )}
       </div>
       {props.bottom ? (
         <div className="absolute bottom-0 left-1/2 transform translate-y-1/2 -translate-x-1/2">
@@ -41,6 +60,8 @@ export function Avatar(props: AvatarProps) {
   );
 }
 
+
+
 export function UserAvatar(props: {
   sizeClass?: string;
   iconClass?: string;
@@ -48,6 +69,7 @@ export function UserAvatar(props: {
   withName?: boolean;
 }) {
   const auth = useAuthStore();
+  const image = auth.account?.profile?.image;
 
   const bufferSeed = useMemo(
     () =>
@@ -84,7 +106,11 @@ export function UserAvatar(props: {
   return (
     <>
       <Avatar
-        profile={auth.account.profile}
+        profile={
+          image
+            ? { ...auth.account.profile, image }
+            : auth.account.profile
+        }
         sizeClass={
           props.sizeClass ?? "w-[1.5rem] h-[1.5rem] ssm:w-[2rem] ssm:h-[2rem]"
         }

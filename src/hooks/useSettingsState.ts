@@ -54,6 +54,7 @@ export function useSettingsState(
         colorA: string;
         colorB: string;
         icon: string;
+        image?: string | null;
       }
     | undefined,
   enableThumbnails: boolean,

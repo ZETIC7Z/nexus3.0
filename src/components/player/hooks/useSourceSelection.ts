@@ -90,6 +90,13 @@ export function useEmbedScraping(
       convertProviderCaption(result.stream[0].captions),
       getSavedProgress(progressItems, meta),
     );
+    // Propagate audioTracks from the embed (e.g. server embed "Original")
+    const embedAudioTracks = (result.stream[0] as any).audioTracks;
+    if (embedAudioTracks?.length) {
+      useAudioTrackStore.getState().setTracks(embedAudioTracks);
+    } else {
+      useAudioTrackStore.getState().reset();
+    }
     // Save the last successful source when manually selected
     if (enableLastSuccessfulSource) {
       setLastSuccessfulSource(sourceId);

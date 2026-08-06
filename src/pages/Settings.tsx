@@ -39,6 +39,7 @@ import { AccountWithToken, useAuthStore } from "@/stores/auth";
 import { useBannerSize } from "@/stores/banner";
 import { useLanguageStore } from "@/stores/language";
 import { usePreferencesStore } from "@/stores/preferences";
+import { useProfileStore } from "@/stores/profiles";
 import { useSubtitleStore } from "@/stores/subtitles";
 import { usePreviewThemeStore, useThemeStore } from "@/stores/theme";
 import { scrollToElement, scrollToHash } from "@/utils/common/scroll";
@@ -132,9 +133,12 @@ export function AccountSettings(props: {
   setColorB: (s: string) => void;
   userIcon: UserIcons;
   setUserIcon: (s: UserIcons) => void;
+  profileImage?: string | null;
+  setProfileImage?: (s: string | null) => void;
 }) {
   const url = useBackendUrl();
   const { account } = props;
+  const profileImage = account.profile.image || null;
   const [sessionsResult, execSessions] = useAsyncFn(() => {
     if (!url) return Promise.resolve([]);
     return getSessions(url, account);
@@ -156,6 +160,8 @@ export function AccountSettings(props: {
         setColorB={props.setColorB}
         userIcon={props.userIcon}
         setUserIcon={props.setUserIcon}
+        profileImage={profileImage}
+        setProfileImage={props.setProfileImage}
       />
       <DeviceListPart
         error={!!sessionsResult.error}
@@ -551,6 +557,7 @@ export function SettingsPage() {
   const updateProfile = useAuthStore((s) => s.setAccountProfile);
   const updateDeviceName = useAuthStore((s) => s.updateDeviceName);
   const updateNickname = useAuthStore((s) => s.setAccountNickname);
+  const updateActiveProfile = useProfileStore((s) => s.updateActiveProfile);
   const decryptedName = useMemo(() => {
     if (!account) return "";
     const parts = account.deviceName?.split(".");
@@ -971,6 +978,14 @@ export function SettingsPage() {
       updateProfile(state.profile.state);
     }
 
+    // Keep the Conflix-style local profile list in sync with the existing
+    // Nexus settings save flow. The backend remains the source of truth for
+    // the account, while each locally selected profile keeps its own nickname
+    // and avatar for the next profile switch.
+    if (state.nickname.changed || state.profile.changed) {
+      updateActiveProfile(state.nickname.state, state.profile.state);
+    }
+
     // when backend url gets changed, show confirmation and log the user out (only if logged in)
     if (state.backendUrl.changed) {
       let url = state.backendUrl.state;
@@ -1016,6 +1031,7 @@ export function SettingsPage() {
     updateDeviceName,
     updateProfile,
     updateNickname,
+    updateActiveProfile,
     setProxyTmdb,
     setEnableCarouselView,
     setEnableMinimalCards,
@@ -1070,6 +1086,11 @@ export function SettingsPage() {
                 userIcon={state.profile.state.icon as any}
                 setUserIcon={(v) =>
                   state.profile.set((s) => (s ? { ...s, icon: v } : undefined))
+                }
+                setProfileImage={(v) =>
+                  state.profile.set((s) =>
+                    s ? { ...s, image: v ?? undefined } : undefined,
+                  )
                 }
               />
             ) : (

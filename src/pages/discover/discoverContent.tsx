@@ -11,6 +11,7 @@ import { useProgressStore } from "@/stores/progress";
 import { MediaItem } from "@/utils/media/mediaTypes";
 
 import { DiscoverNavigation } from "./components/DiscoverNavigation";
+import { CountryPicksCarousel } from "./components/CountryPicksCarousel";
 import type { FeaturedMedia } from "./components/FeaturedCarousel";
 import { LazyMediaCarousel } from "./components/LazyMediaCarousel";
 import { PersonalRecommendationsCarousel } from "./components/PersonalRecommendationsCarousel";
@@ -285,6 +286,8 @@ export function DiscoverContent() {
         selectedCategory={selectedCategory}
         onCategoryChange={handleCategoryChange}
       />
+
+      <CountryPicksCarousel onShowDetails={handleShowDetails} />
 
       <WideContainer ultraWide classNames="!px-0">
         {/* Movies Tab */}

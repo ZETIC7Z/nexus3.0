@@ -237,7 +237,7 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   // Mark audio as "Original" — Zephyr's source language varies
   stream.audioTracks = [{
     id: "vidfast2-audio-original",
-    label: "Original",
+    label: "🌐 Original",
     language: "und",
     url: videoUrl,
     default: true,

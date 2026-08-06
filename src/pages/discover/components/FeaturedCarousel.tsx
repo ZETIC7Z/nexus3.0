@@ -1,6 +1,6 @@
 import classNames from "classnames";
 import { t } from "i18next";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWindowSize } from "react-use";
 
@@ -43,6 +43,14 @@ export interface FeaturedMedia extends Partial<Movie & TVShow> {
   external_ids?: {
     imdb_id?: string;
   };
+  videos?: {
+    results?: Array<{
+      key: string;
+      site: string;
+      type: string;
+      official?: boolean;
+    }>;
+  };
 }
 
 interface FeaturedCarouselProps {
@@ -51,6 +59,10 @@ interface FeaturedCarouselProps {
   searching?: boolean;
   shorter?: boolean;
   forcedCategory?: "movies" | "tvshows" | "editorpicks";
+  /** Kid-safe genre filter. When set, discover queries are restricted to
+   * these TMDB genre IDs and `include_adult` is forced to "false". */
+  withGenres?: string;
+  includeAdult?: string;
 }
 
 interface IMDbRatingData {
@@ -122,6 +134,8 @@ export function FeaturedCarousel({
   searching,
   shorter,
   forcedCategory,
+  withGenres,
+  includeAdult,
 }: FeaturedCarouselProps) {
   const { selectedCategory } = useDiscoverStore();
   const effectiveCategory = forcedCategory || selectedCategory;
@@ -149,8 +163,86 @@ export function FeaturedCarousel({
     null,
   );
   const [contentOpacity, setContentOpacity] = useState(1);
+  const [isMuted, setIsMuted] = useState(true);
+  const [trailerReady, setTrailerReady] = useState(false);
+  const trailerTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const trailerIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const trailerDurationRef = useRef<number | null>(null);
+  const advanceLockRef = useRef(false);
+
+  // Advance one slide (used by autoplay + trailer-end detection).
+  const advanceSlide = useCallback(() => {
+    // Guard against double-advance (repeated YouTube onStateChange messages,
+    // or a race between the trailer-end message and the hold timeout).
+    if (advanceLockRef.current || media.length === 0) return;
+    advanceLockRef.current = true;
+    setContentOpacity(0);
+    setImdbRatings({});
+    setReleaseInfo(null);
+    setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % media.length);
+      setLogoUrl(undefined);
+      setTimeout(() => setContentOpacity(1), 100);
+    }, 150);
+  }, [media.length]);
 
   const currentMedia = media[currentIndex];
+
+  // Get trailer key for current media (Netflix-style)
+  const getTrailerKey = (): string | null => {
+    if (!currentMedia?.videos?.results) return null;
+    const videos = currentMedia.videos.results;
+    // Priority: official trailer > any trailer > teaser > clip
+    const trailer =
+      videos.find((v) => v.site === "YouTube" && v.type === "Trailer" && v.official) ||
+      videos.find((v) => v.site === "YouTube" && v.type === "Trailer") ||
+      videos.find((v) => v.site === "YouTube" && v.type === "Teaser") ||
+      videos.find((v) => v.site === "YouTube");
+    return trailer?.key || null;
+  };
+
+  const trailerKey = getTrailerKey();
+
+  // Netflix behavior: when the official trailer finishes playing, advance to
+  // the next slide. The YouTube IFrame API posts onStateChange (info 0 =
+  // ended) to the parent window — we listen for it on the hero's own iframe.
+  useEffect(() => {
+    if (!trailerKey || !trailerReady) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== trailerIframeRef.current?.contentWindow) return;
+      const data = event.data as
+        | { event?: string; info?: { duration?: number } | number }
+        | null;
+      if (!data || typeof data !== "object") return;
+      // Capture the trailer's real duration for the autoplay timeout.
+      if (
+        data.event === "infoDelivery" &&
+        typeof data.info === "object" &&
+        typeof data.info?.duration === "number"
+      ) {
+        trailerDurationRef.current = data.info.duration * 1000;
+      }
+      // Trailer ended → move to the next slide (Netflix style). Only advance
+      // when autoplay is on and the carousel is not in a transition.
+      if (data.event === "onStateChange" && data.info === 0 && isAutoPlaying) {
+        advanceSlide();
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [trailerKey, trailerReady, isAutoPlaying, advanceSlide]);
+
+  // Reset trailer ready state + the advance lock on slide change
+  useEffect(() => {
+    setTrailerReady(false);
+    advanceLockRef.current = false;
+    if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+    // Show trailer after a brief delay for transition
+    trailerTimerRef.current = setTimeout(() => setTrailerReady(true), 500);
+    return () => {
+      if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
+    };
+  }, [currentIndex]);
 
   const SLIDE_QUANTITY = 10;
   const FETCH_QUANTITY = 20;
@@ -208,6 +300,54 @@ export function FeaturedCarousel({
       // Clear all previous data when transitioning
       setLogoUrl(undefined);
       setImdbRatings({});
+
+      // ---- kid-safe path (withGenres) ----
+      if (withGenres) {
+        try {
+          const listData = await get<any>(
+            effectiveCategory === "tvshows" ? "/discover/tv" : "/discover/movie",
+            {
+              language: "en-US",
+              sort_by: "popularity.desc",
+              with_genres: withGenres,
+              include_adult: includeAdult ?? "false",
+            },
+          );
+          // allSettled: one failed detail fetch must never blank the whole
+          // hero (that's what killed the kids trailer/hero before).
+          const results = await Promise.allSettled(
+            (listData.results ?? []).slice(0, 20).map((item: any) =>
+              get<any>(
+                `/${effectiveCategory === "tvshows" ? "tv" : "movie"}/${item.id}`,
+                {
+                  language: "en-US",
+                  append_to_response: "external_ids,videos",
+                },
+              ),
+            ),
+          );
+          const mediaItems = results
+            .filter(
+              (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled",
+            )
+            .map((r) => r.value)
+            .filter((item: any) => item?.id != null)
+            .map((item: any) => ({
+              ...item,
+              type:
+                effectiveCategory === "tvshows" ? ("show" as const) : ("movie" as const),
+            }));
+          setMedia(mediaItems.slice(0, SLIDE_QUANTITY));
+        } catch (error) {
+          console.error("Error fetching kids featured media:", error);
+          setMedia([]);
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      // ---- normal path ----
       setReleaseInfo(null);
       setCurrentIndex(0);
       setContentOpacity(1);
@@ -233,7 +373,7 @@ export function FeaturedCarousel({
                 `/${effectiveCategory === "movies" ? "movie" : "tv"}/${id}`,
                 {
                   language: formattedLanguage,
-                  append_to_response: "external_ids",
+                  append_to_response: "external_ids,videos",
                 },
               ),
             );
@@ -271,7 +411,7 @@ export function FeaturedCarousel({
                 .map((movie: any) =>
                   get<any>(`/movie/${movie.id}`, {
                       language: formattedLanguage,
-                    append_to_response: "external_ids",
+                    append_to_response: "external_ids,videos",
                   }),
                 );
 
@@ -302,7 +442,7 @@ export function FeaturedCarousel({
                 .map((show: any) =>
                   get<any>(`/tv/${show.id}`, {
                       language: formattedLanguage,
-                    append_to_response: "external_ids",
+                    append_to_response: "external_ids,videos",
                   }),
                 );
 
@@ -347,14 +487,14 @@ export function FeaturedCarousel({
           const moviePromises = selectedMovieIds.map(({ id }) =>
             get<any>(`/movie/${id}`, {
               language: formattedLanguage,
-              append_to_response: "external_ids",
+              append_to_response: "external_ids,videos",
             }),
           );
 
           const showPromises = selectedShowIds.map(({ id }) =>
             get<any>(`/tv/${id}`, {
               language: formattedLanguage,
-              append_to_response: "external_ids",
+              append_to_response: "external_ids,videos",
             }),
           );
 
@@ -382,7 +522,7 @@ export function FeaturedCarousel({
     };
 
     fetchFeaturedMedia();
-  }, [formattedLanguage, effectiveCategory]);
+  }, [formattedLanguage, effectiveCategory, withGenres, includeAdult]);
 
   const handlePrevSlide = () => {
     setContentOpacity(0);
@@ -514,29 +654,32 @@ export function FeaturedCarousel({
     };
   }, []);
 
+  // Autoplay: if the current slide has a trailer, hold it for the trailer's
+  // real duration (falling back to a generous cap so we never get stuck) and
+  // rely on the trailer-end message to advance early. Without a trailer we
+  // keep the classic fixed SLIDE_DURATION interval.
   useEffect(() => {
-    if (isAutoPlaying && media.length > 0) {
-      autoPlayInterval.current = setInterval(() => {
-        setContentOpacity(0);
-        setImdbRatings({});
-        setReleaseInfo(null);
+    if (!isAutoPlaying || media.length === 0) return;
 
-        // Wait for fade out, then change index and fade in
-        setTimeout(() => {
-          setCurrentIndex((prev) => (prev + 1) % media.length);
-          // Clear logo after index change so new logo can load
-          setLogoUrl(undefined);
-          setTimeout(() => setContentOpacity(1), 100);
-        }, 150);
-      }, SLIDE_DURATION);
+    let timer: NodeJS.Timeout | null = null;
+    if (trailerKey && trailerReady) {
+      const duration = trailerDurationRef.current;
+      // Trailer length + 1s buffer; cap at 5 min so a broken video can't
+      // freeze the hero forever.
+      const hold = Math.min(
+        (duration ?? 15000) + 1000,
+        5 * 60 * 1000,
+      );
+      timer = setTimeout(advanceSlide, hold);
+    } else {
+      timer = setInterval(advanceSlide, SLIDE_DURATION);
     }
 
     return () => {
-      if (autoPlayInterval.current) {
-        clearInterval(autoPlayInterval.current);
-      }
+      if (timer) clearTimeout(timer);
+      if (autoPlayInterval.current) clearInterval(autoPlayInterval.current);
     };
-  }, [isAutoPlaying, media.length]);
+  }, [isAutoPlaying, media.length, trailerKey, trailerReady, currentIndex, advanceSlide]);
 
   useEffect(() => {
     const fetchReleaseInfo = async () => {
@@ -631,17 +774,75 @@ export function FeaturedCarousel({
             className={`absolute inset-0 transition-opacity duration-1000 ${
               index === currentIndex ? "opacity-100" : "opacity-0"
             }`}
-            style={{
-              backgroundImage: `url(https://image.tmdb.org/t/p/original${item.backdrop_path})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center top",
-              maskImage:
-                "linear-gradient(to top, rgba(0, 0, 0, 0), rgba(0, 0, 0, 1) 700px)",
-              WebkitMaskImage:
-                "linear-gradient(to top, rgba(0, 0, 0, 0), rgba(0, 0, 0, 1) 700px)",
-            }}
-          />
+          >
+            {/* Netflix-style Trailer Video Background */}
+            {trailerKey && trailerReady && index === currentIndex && (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                {/* YouTube embed scaled to cover */}
+                <div
+                  className="absolute"
+                  style={{
+                    width: "177.78vh",
+                    height: "100vh",
+                    minWidth: "100%",
+                    minHeight: "56.25vw",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  <iframe
+                    ref={trailerIframeRef}
+                    src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&enablejsapi=1&start=5`}
+                    className="absolute inset-0 w-full h-full"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen={false}
+                    title="Trailer"
+                    style={{ border: "none", pointerEvents: "none" }}
+                  />
+                </div>
+                {/* Dark overlay to make text readable */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-transparent to-black/30" />
+              </div>
+            )}
+
+            {/* Fallback: Backdrop image */}
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url(https://image.tmdb.org/t/p/original${item.backdrop_path})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center top",
+                opacity: trailerKey && trailerReady ? 0 : 1,
+                transition: "opacity 1s ease-in-out",
+              }}
+            />
+          </div>
         ))}
+
+        {/* Netflix-style Mute/Unmute button */}
+        {trailerKey && trailerReady && (
+          <button
+            type="button"
+            onClick={() => setIsMuted(!isMuted)}
+            className={classNames(
+              "absolute bottom-48 right-8 md:right-12 z-20",
+              "flex items-center justify-center",
+              "w-10 h-10 rounded-full border border-white/40",
+              "bg-black/30 hover:bg-black/50 backdrop-blur-sm",
+              "transition-all duration-200 hover:border-white/70",
+              "text-white/80 hover:text-white",
+              searchClasses,
+            )}
+            title={isMuted ? "Unmute" : "Mute"}
+          >
+            <Icon
+              icon={isMuted ? Icons.VOLUME_X : Icons.VOLUME}
+              className="text-lg"
+            />
+          </button>
+        )}
       </div>
 
       {/* Navigation Buttons */}

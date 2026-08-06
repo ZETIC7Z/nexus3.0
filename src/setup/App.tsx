@@ -10,8 +10,16 @@ import {
 } from "react-router-dom";
 
 import { convertLegacyUrl, isLegacyUrl } from "@/backend/metadata/getmeta";
-import { generateQuickSearchMediaUrl } from "@/backend/metadata/tmdb";
-import { AuthModal, useAuthModal } from "@/components/overlays/auth";
+import {
+  decodeTMDBId,
+  generateQuickSearchMediaUrl,
+  getMediaDetails,
+} from "@/backend/metadata/tmdb";
+import { TMDBContentTypes } from "@/backend/metadata/types/tmdb";
+import { KID_SAFE_GENRES } from "@/utils/media/kidsSearch";
+import { useProfileStore } from "@/stores/profiles";
+
+import { AuthModal } from "@/components/overlays/auth";
 import { DetailsModal } from "@/components/overlays/detailsModal";
 import { DownloadModal } from "@/components/overlays/downloadModal";
 import { GamepadControlsModal } from "@/components/overlays/GamepadControlsModal";
@@ -27,6 +35,7 @@ import { useGlobalKeyboardEvents } from "@/hooks/useGlobalKeyboardEvents";
 import { useOnlineListener } from "@/hooks/usePing";
 import { useNotificationInit } from "@/hooks/useNotifications";
 import { AboutPage } from "@/pages/About";
+import { AppsPage } from "@/pages/Apps";
 import { AllBookmarks } from "@/pages/bookmarks/AllBookmarks";
 import { DiscoverMore } from "@/pages/discover/AllMovieLists";
 import { Discover } from "@/pages/discover/Discover";
@@ -37,6 +46,8 @@ import { HomePage } from "@/pages/HomePage";
 import { PersonView } from "@/pages/PersonView";
 import { CelPage } from "@/pages/Cel";
 import { LegalPage, shouldHaveLegalPage } from "@/pages/Legal";
+import { LoginPage } from "@/pages/Login";
+import { RegisterPage } from "@/pages/Register";
 import { MigrationPage } from "@/pages/migration/Migration";
 import { MigrationDirectPage } from "@/pages/migration/MigrationDirect";
 import { MigrationDownloadPage } from "@/pages/migration/MigrationDownload";
@@ -46,6 +57,8 @@ import { OnboardingPage } from "@/pages/onboarding/Onboarding";
 import { OnboardingExtensionPage } from "@/pages/onboarding/OnboardingExtension";
 import { OnboardingProxyPage } from "@/pages/onboarding/OnboardingProxy";
 import { PasPage } from "@/pages/Pas";
+import { ProfileSelect } from "@/pages/ProfileSelect";
+import { KidsPage } from "@/pages/Kids";
 import { SupportPage } from "@/pages/Support";
 import { MyAlgorithmPage } from "@/pages/algorithm/MyAlgorithm";
 import { WatchHistory } from "@/pages/watchHistory/WatchHistory";
@@ -64,6 +77,85 @@ const SettingsPage = lazyWithPreload(() => import("@/pages/Settings"));
 
 PlayerView.preload();
 SettingsPage.preload();
+
+/**
+ * Netflix-style kids lockdown: while a kids profile is active, only kid-safe
+ * surfaces (/kids, /profiles, /settings, /media) are reachable. Anything else
+ * (browse, discover, bookmarks, history, person pages, …) bounces back to
+ * /kids so no adult content can ever be displayed.
+ */
+function KidsRouteGuard({ children }: { children: ReactElement }) {
+  const location = useLocation();
+  const isKidsActive = useProfileStore((s) => {
+    if (!s.activeProfileId) return false;
+    const active = s.profiles.find((p) => p.id === s.activeProfileId);
+    return !!active?.isKids;
+  });
+
+  if (!isKidsActive) return children;
+
+  const path = location.pathname;
+  const allowed =
+    path.startsWith("/kids") ||
+    path === "/profiles" ||
+    path === "/settings" ||
+    path.startsWith("/media/");
+  if (allowed) return children;
+
+  return <Navigate to="/kids" replace />;
+}
+
+/**
+ * Guards direct /media/:media URL access while a kids profile is active.
+ * Browsing/search are already kid-filtered, but someone could type a URL to
+ * an arbitrary title — so we verify the actual media's genres before allowing
+ * playback. Anything without a core kids genre bounces back to /kids.
+ */
+function MediaKidsGuard() {
+  const { media } = useParams<{ media: string }>();
+  const isKidsActive = useProfileStore((s) => {
+    if (!s.activeProfileId) return false;
+    const active = s.profiles.find((p) => p.id === s.activeProfileId);
+    return !!active?.isKids;
+  });
+  const [ok, setOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setOk(null);
+    if (!isKidsActive || !media) {
+      setOk(true);
+      return;
+    }
+    const decoded = decodeTMDBId(media);
+    if (!decoded) {
+      setOk(false);
+      return;
+    }
+    getMediaDetails(
+      decoded.id,
+      decoded.type === "movie" ? TMDBContentTypes.MOVIE : TMDBContentTypes.TV,
+      false,
+    )
+      .then((data: any) => {
+        if (cancelled) return;
+        const genres: number[] = (data?.genres ?? []).map((g: any) => g.id);
+        const kidSafe = genres.some((g) => KID_SAFE_GENRES.has(g));
+        // Some kid titles list no genres at all — treat as safe rather than
+        // blocking; the content itself came from kid-filtered sources.
+        setOk(genres.length === 0 || kidSafe);
+      })
+      .catch(() => {
+        if (!cancelled) setOk(true); // let the player handle load errors
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [media, isKidsActive]);
+
+  if (ok === false) return <Navigate to="/kids" replace />;
+  return null; // guard passes; caller wraps the actual page
+}
 
 function LegacyUrlView({ children }: { children: ReactElement }) {
   const location = useLocation();
@@ -110,16 +202,6 @@ function QueryView() {
     }
   }, [query, navigate]);
 
-  return null;
-}
-
-function AuthRouteRedirect({ mode }: { mode: "login" | "trust" }) {
-  const { openAuthModal } = useAuthModal();
-  const navigate = useNavigate();
-  useEffect(() => {
-    openAuthModal(mode);
-    navigate("/", { replace: true });
-  }, [openAuthModal, mode, navigate]);
   return null;
 }
 
@@ -226,9 +308,12 @@ function App() {
             path="/media/:media"
             element={
               <LegacyUrlView>
-                <Suspense fallback={null}>
-                  <PlayerView />
-                </Suspense>
+                <>
+                  <MediaKidsGuard />
+                  <Suspense fallback={null}>
+                    <PlayerView />
+                  </Suspense>
+                </>
               </LegacyUrlView>
             }
           />
@@ -236,17 +321,23 @@ function App() {
             path="/media/:media/:season/:episode"
             element={
               <LegacyUrlView>
-                <Suspense fallback={null}>
-                  <PlayerView />
-                </Suspense>
+                <>
+                  <MediaKidsGuard />
+                  <Suspense fallback={null}>
+                    <PlayerView />
+                  </Suspense>
+                </>
               </LegacyUrlView>
             }
           />
-          <Route path="/browse/:query?" element={<HomePage />} />
-          <Route path="/" element={<HomePage />} />
-          <Route path="/register" element={<AuthRouteRedirect mode="trust" />} />
-          <Route path="/login" element={<AuthRouteRedirect mode="login" />} />
-          <Route path="/about" element={<AboutPage />} />
+          <Route path="/browse/:query?" element={<KidsRouteGuard><HomePage /></KidsRouteGuard>} />
+          <Route path="/" element={<KidsRouteGuard><HomePage /></KidsRouteGuard>} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/profiles" element={<ProfileSelect />} />
+          <Route path="/kids/:query?" element={<KidsPage />} />
+          <Route path="/about" element={<KidsRouteGuard><AboutPage /></KidsRouteGuard>} />
+          <Route path="/apps" element={<KidsRouteGuard><AppsPage /></KidsRouteGuard>} />
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route
             path="/onboarding/extension"
@@ -268,27 +359,35 @@ function App() {
             <Route path="/legal" element={<LegalPage />} />
           ) : null}
           {/* Support page */}
-          <Route path="/support" element={<SupportPage />} />
-          <Route path="/cel" element={<CelPage />} />
-          <Route path="/pas" element={<PasPage />} />
+          <Route path="/support" element={<KidsRouteGuard><SupportPage /></KidsRouteGuard>} />
+          <Route path="/cel" element={<KidsRouteGuard><CelPage /></KidsRouteGuard>} />
+          <Route path="/pas" element={<KidsRouteGuard><PasPage /></KidsRouteGuard>} />
           {/* Discover pages */}
-          <Route path="/discover" element={<Discover />} />
+          <Route path="/discover" element={<KidsRouteGuard><Discover /></KidsRouteGuard>} />
           <Route
             path="/discover/more/:contentType/:mediaType"
-            element={<MoreContent />}
+            element={
+              <KidsRouteGuard>
+                <MoreContent />
+              </KidsRouteGuard>
+            }
           />
           <Route
             path="/discover/more/:contentType/:id/:mediaType"
-            element={<MoreContent />}
+            element={
+              <KidsRouteGuard>
+                <MoreContent />
+              </KidsRouteGuard>
+            }
           />
-          <Route path="/discover/more/:category" element={<MoreContent />} />
-          <Route path="/discover/all" element={<DiscoverMore />} />
+          <Route path="/discover/more/:category" element={<KidsRouteGuard><MoreContent /></KidsRouteGuard>} />
+          <Route path="/discover/all" element={<KidsRouteGuard><DiscoverMore /></KidsRouteGuard>} />
           {/* Bookmarks page */}
-          <Route path="/bookmarks" element={<AllBookmarks />} />
-          <Route path="/person/:id" element={<PersonView />} />
+          <Route path="/bookmarks" element={<KidsRouteGuard><AllBookmarks /></KidsRouteGuard>} />
+          <Route path="/person/:id" element={<KidsRouteGuard><PersonView /></KidsRouteGuard>} />
           {/* Watch History page */}
-          <Route path="/watch-history" element={<WatchHistory />} />
-          <Route path="/algorithm" element={<MyAlgorithmPage />} />
+          <Route path="/watch-history" element={<KidsRouteGuard><WatchHistory /></KidsRouteGuard>} />
+          <Route path="/algorithm" element={<KidsRouteGuard><MyAlgorithmPage /></KidsRouteGuard>} />
           {/* Settings page */}
           <Route
             path="/settings"

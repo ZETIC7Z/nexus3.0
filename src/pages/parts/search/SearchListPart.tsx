@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 import { searchForMedia } from "@/backend/metadata/search";
 import { MWQuery } from "@/backend/metadata/types/mw";
+import { kidsSearchForMedia } from "@/utils/media/kidsSearch";
+import { useProfileStore } from "@/stores/profiles";
 import { IconPatch } from "@/components/buttons/IconPatch";
 import { Icons } from "@/components/Icon";
 import { SectionHeading } from "@/components/layout/SectionHeading";
@@ -65,6 +67,13 @@ export function SearchListPart({
   onShowDetails?: (media: MediaItem) => void;
 }) {
   const { t } = useTranslation();
+  // When the active profile is a kids profile, search MUST only surface
+  // kid-safe content — no adult or general-audience results, ever.
+  const isKidsProfile = useProfileStore((s) => {
+    if (!s.activeProfileId) return false;
+    const active = s.profiles.find((p) => p.id === s.activeProfileId);
+    return !!active?.isKids;
+  });
 
   const [results, setResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -80,7 +89,9 @@ export function SearchListPart({
       let nextResults: MediaItem[] = [];
       let didFail = false;
       try {
-        nextResults = (await searchForMedia(query)) ?? [];
+        nextResults = isKidsProfile
+          ? ((await kidsSearchForMedia(query.searchQuery)) ?? [])
+          : ((await searchForMedia(query)) ?? []);
       } catch {
         didFail = true;
       }
@@ -104,7 +115,7 @@ export function SearchListPart({
 
     requestIdRef.current += 1;
     runSearch({ searchQuery: debouncedSearchQuery }, requestIdRef.current);
-  }, [debouncedSearchQuery]);
+  }, [debouncedSearchQuery, isKidsProfile]);
 
   if (loading) return <SearchLoadingPart />;
   if (failed) return <SearchSuffix failed />;

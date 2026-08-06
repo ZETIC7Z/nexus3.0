@@ -4,10 +4,11 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useAsync } from "react-use";
 
-import { base64ToBuffer, decryptData } from "@/backend/accounts/crypto";
+import { base64ToBuffer } from "@/backend/accounts/crypto";
 import { getBackendMeta } from "@/backend/accounts/meta";
 import { getRoomStatuses } from "@/backend/player/status";
 import { UserAvatar } from "@/components/Avatar";
+import { ConflixAvatar } from "@/components/ConflixAvatar";
 import { Icon, Icons } from "@/components/Icon";
 import { Spinner } from "@/components/layout/Spinner";
 import { Transition } from "@/components/utils/Transition";
@@ -213,8 +214,11 @@ function WatchPartyInputLink() {
 export function LinksDropdown(props: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const deviceName = useAuthStore((s) => s.account?.deviceName);
-  const seed = useAuthStore((s) => s.account?.seed);
+  const account = useAuthStore((s) => s.account);
+  const deviceName = account?.deviceName;
+  const nickname = account?.nickname;
+  const profile = account?.profile;
+  const seed = account?.seed;
   const bufferSeed = useMemo(
     () => (seed ? base64ToBuffer(seed) : null),
     [seed],
@@ -290,20 +294,16 @@ export function LinksDropdown(props: { children: React.ReactNode }) {
             
             <Transition animation="slide-full-right" show={!!deviceName && !!bufferSeed} className="absolute inset-0 w-full">
               <DropdownLink className="text-white" href="/settings">
-                <UserAvatar />
-                {(() => {
-                  const parts = deviceName?.split(".");
-                  if (!parts || parts.length !== 3) return deviceName;
-                  try {
-                    return decryptData(deviceName as string, bufferSeed!);
-                  } catch (error) {
-                    console.warn(
-                      "Failed to decrypt device name in LinksDropdown, using fallback:",
-                      error,
-                    );
-                    return t("settings.account.unknownDevice");
-                  }
-                })()}
+                {profile?.image ? (
+                  <ConflixAvatar
+                    profile={profile as any}
+                    sizeClass="w-7 h-7"
+                    iconClass="text-sm"
+                  />
+                ) : (
+                  <UserAvatar />
+                )}
+                <span className="ml-1">{nickname || "NEXUS"}</span>
               </DropdownLink>
             </Transition>
           </div>
@@ -355,6 +355,9 @@ export function LinksDropdown(props: { children: React.ReactNode }) {
           </DropdownLink>
           {backendSupportsWatchParty && <WatchPartyInputLink />}
           <Transition animation="slide-up" show={!!deviceName}>
+            <DropdownLink href="/profiles" icon={Icons.USER}>
+              {t("navigation.menu.switchProfile")}
+            </DropdownLink>
             <DropdownLink
               className="!text-type-danger opacity-75 hover:opacity-100"
               icon={Icons.LOGOUT}

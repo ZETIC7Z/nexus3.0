@@ -1,98 +1,119 @@
-import { useEffect, useState } from "react";
-import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { useAsync } from "react-use";
 
+import { Button } from "@/components/buttons/Button";
+import { BackendSelector } from "@/components/form/BackendSelector";
+import {
+  LargeCard,
+  LargeCardButtons,
+  LargeCardText,
+} from "@/components/layout/LargeCard";
 import { SubPageLayout } from "@/pages/layouts/SubPageLayout";
-import { CredentialsCreatePart } from "@/pages/parts/auth/CredentialsCreatePart";
-import { PassphraseDisplayPart } from "@/pages/parts/auth/PassphraseDisplayPart";
+import {
+  AccountCreatePart,
+  AccountProfile,
+} from "@/pages/parts/auth/AccountCreatePart";
+import { TrustBackendPart } from "@/pages/parts/auth/TrustBackendPart";
 import { PageTitle } from "@/pages/parts/util/PageTitle";
-import { useAuthStore } from "@/stores/auth";
 import { conf } from "@/setup/config";
-import { getBackendMeta } from "@/backend/accounts/meta";
-import { Loading } from "@/components/layout/Loading";
-
-interface RegistrationData {
-  mnemonic: string;
-  username: string;
-}
-
-function CaptchaProvider(props: { siteKey: string | null; children: React.ReactNode }) {
-  if (!props.siteKey) return props.children as JSX.Element;
-  return (
-    <GoogleReCaptchaProvider
-      reCaptchaKey={props.siteKey}
-      language="en"
-    >
-      {props.children}
-    </GoogleReCaptchaProvider>
-  );
-}
+import { useAuthStore } from "@/stores/auth";
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const setBackendUrl = useAuthStore((s) => s.setBackendUrl);
-  const backendUrl = conf().BACKEND_URL;
-  
-  useEffect(() => {
-    if (backendUrl) {
-      setBackendUrl(backendUrl);
+  const currentBackendUrl = useAuthStore((s) => s.backendUrl);
+  const config = conf();
+  const availableBackends =
+    config.BACKEND_URLS.length > 0
+      ? config.BACKEND_URLS
+      : config.BACKEND_URL
+        ? [config.BACKEND_URL]
+        : [];
+
+  const defaultBackend =
+    currentBackendUrl ??
+    (availableBackends.length === 1 ? availableBackends[0] : null);
+
+  const [step, setStep] = useState(
+    availableBackends.length > 1 || !defaultBackend ? -1 : 0,
+  );
+  const [account, setAccount] = useState<null | AccountProfile>(null);
+  const [selectedBackendUrl, setSelectedBackendUrl] = useState<string | null>(
+    currentBackendUrl ?? defaultBackend ?? null,
+  );
+
+  const handleBackendSelect = (url: string | null) => {
+    setSelectedBackendUrl(url);
+    if (url) {
+      setBackendUrl(url);
     }
-  }, [setBackendUrl, backendUrl]);
-
-  const [step, setStep] = useState(1);
-  const [siteKey, setSiteKey] = useState<string | null>(null);
-  
-  const metaResult = useAsync(() => {
-    if (!backendUrl) return Promise.resolve(null);
-    return getBackendMeta(backendUrl);
-  }, [backendUrl]);
-
-  useEffect(() => {
-    if (metaResult.value) {
-      setSiteKey(
-        metaResult.value.hasCaptcha && metaResult.value.captchaClientKey
-          ? metaResult.value.captchaClientKey
-          : null
-      );
-    }
-  }, [metaResult.value]);
-
-  const [registrationData, setRegistrationData] = useState<RegistrationData>({
-    mnemonic: "",
-    username: "",
-  });
+  };
 
   return (
-    <CaptchaProvider siteKey={siteKey}>
-      <SubPageLayout>
-        <PageTitle subpage k="global.pages.register" />
-        
-        {metaResult.loading && <div className="flex justify-center items-center py-12"><Loading /></div>}
-        
-        {!metaResult.loading && step === 1 ? (
-          <CredentialsCreatePart
-            hasCaptcha={!!siteKey}
-            onNext={(data) => {
-              setRegistrationData({
-                mnemonic: data.mnemonic,
-                username: data.username,
-              });
-              setStep(2);
-            }}
+    <SubPageLayout>
+      <PageTitle subpage k="global.pages.register" />
+      {step === -1 && (availableBackends.length > 1 || !defaultBackend) ? (
+        <LargeCard>
+          <LargeCardText title={t("auth.backendSelection.title")}>
+            {t("auth.backendSelection.description")}
+          </LargeCardText>
+          <BackendSelector
+            selectedUrl={selectedBackendUrl}
+            onSelect={handleBackendSelect}
+            availableUrls={availableBackends}
+            showCustom
           />
-        ) : null}
-        
-        {!metaResult.loading && step === 2 ? (
-          <PassphraseDisplayPart
-            mnemonic={registrationData.mnemonic}
-            username={registrationData.username}
-            onNext={() => {
-              navigate("/");
-            }}
-          />
-        ) : null}
-      </SubPageLayout>
-    </CaptchaProvider>
+          <LargeCardButtons>
+            <span className="text-type-danger font-medium text-center">
+              {t("settings.connections.server.notice")}
+            </span>
+            <Button
+              theme="purple"
+              onClick={() => {
+                if (selectedBackendUrl) {
+                  setStep(0);
+                }
+              }}
+              disabled={!selectedBackendUrl}
+            >
+              {t("auth.register.information.next")}
+            </Button>
+          </LargeCardButtons>
+        </LargeCard>
+      ) : null}
+      {step === 0 ? (
+        <TrustBackendPart
+          backendUrl={selectedBackendUrl}
+          onNext={() => {
+            setStep(1);
+          }}
+        />
+      ) : null}
+      {step === 1 ? (
+        <AccountCreatePart
+          onNext={(a) => {
+            setAccount(a);
+            setStep(2);
+          }}
+        />
+      ) : null}
+      {step === 2 && account ? (
+        <LargeCard>
+          <LargeCardText title={t("auth.createAccount") || "Account Created"}>
+            Your account has been created. You can now sign in.
+          </LargeCardText>
+          <LargeCardButtons>
+            <Button
+              theme="purple"
+              onClick={() => navigate("/login")}
+            >
+              {t("auth.login.goToLogin") || "Go to Login"}
+            </Button>
+          </LargeCardButtons>
+        </LargeCard>
+      ) : null}
+    </SubPageLayout>
   );
 }

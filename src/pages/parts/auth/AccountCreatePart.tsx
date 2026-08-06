@@ -19,6 +19,8 @@ export interface AccountProfile {
     colorA: string;
     colorB: string;
     icon: string;
+    /** Conflix-style image avatar. */
+    image?: string | null;
   };
 }
 

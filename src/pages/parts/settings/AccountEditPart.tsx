@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { useAsyncFn } from "react-use";
 
 import { createPasskey, isPasskeySupported } from "@/backend/accounts/crypto";
-import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/buttons/Button";
+import { ConflixAvatar } from "@/components/ConflixAvatar";
 import { Icon, Icons } from "@/components/Icon";
 import { SettingsCard } from "@/components/layout/SettingsCard";
 import { useModal } from "@/components/overlays/Modal";
@@ -25,8 +26,11 @@ export function AccountEditPart(props: {
   setColorB: (s: string) => void;
   userIcon: UserIcons;
   setUserIcon: (s: UserIcons) => void;
+  profileImage?: string | null;
+  setProfileImage?: (s: string | null) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { logout } = useAuth();
   const profileEditModal = useModal("profile-edit");
   const account = useAuthStore((s) => s.account);
@@ -50,23 +54,35 @@ export function AccountEditPart(props: {
       <ProfileEditModal
         id={profileEditModal.id}
         close={profileEditModal.hide}
-        colorA={props.colorA}
-        setColorA={props.setColorA}
-        colorB={props.colorB}
-        setColorB={props.setColorB}
-        userIcon={props.userIcon}
-        setUserIcon={props.setUserIcon}
+        value={{
+          colorA: props.colorA,
+          colorB: props.colorB,
+          icon: props.userIcon,
+          image: props.profileImage ?? null,
+        }}
+        onChange={(value) => {
+          props.setColorA(value.colorA);
+          props.setColorB(value.colorB);
+          props.setUserIcon(value.icon as UserIcons);
+          if (props.setProfileImage) {
+            props.setProfileImage(value.image ?? null);
+          }
+        }}
+        nickname={props.nickname}
+        setNickname={props.setNickname}
       />
       <div className="grid lg:grid-cols-[auto,1fr] gap-8">
         <div>
-          <Avatar
+          <ConflixAvatar
             profile={{
               colorA: props.colorA,
               colorB: props.colorB,
               icon: props.userIcon,
+              image: props.profileImage,
             }}
             iconClass="text-5xl"
-            sizeClass="w-32 h-32"
+            sizeClass="w-32 h-32 rounded-[8px]"
+            square
             bottom={
               <button
                 type="button"
@@ -111,6 +127,15 @@ export function AccountEditPart(props: {
           <div className="flex flex-wrap items-center gap-3 mt-4">
             <Button className="logout-button" theme="danger" onClick={logout}>
               {t("settings.account.accountDetails.logoutButton")}
+            </Button>
+            <Button
+              type="button"
+              theme="secondary"
+              onClick={() => navigate("/profiles")}
+              className="flex items-center gap-2"
+            >
+              <Icon icon={Icons.USER} />
+              Switch profile
             </Button>
 
             <Button

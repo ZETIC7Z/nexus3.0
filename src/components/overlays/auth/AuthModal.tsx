@@ -9,16 +9,17 @@ import { OverlayPortal } from "@/components/overlays/OverlayDisplay";
 import { useModal } from "@/components/overlays/Modal";
 import { Button } from "@/components/buttons/Button";
 import { Icon, Icons } from "@/components/Icon";
-import { ColorPicker } from "@/components/form/ColorPicker";
-import { IconPicker } from "@/components/form/IconPicker";
-import { Avatar } from "@/components/Avatar";
+import { ConflixAvatar } from "@/components/ConflixAvatar";
+import { AvatarPicker } from "@/components/AvatarPicker";
 import { UserIcons } from "@/components/UserIcon";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useBackendUrl } from "@/hooks/auth/useBackendUrl";
 import { useAuthStore } from "@/stores/auth";
 import { useBookmarkStore } from "@/stores/bookmarks";
 import { useProgressStore } from "@/stores/progress";
+import { markNewSignup } from "@/stores/profiles";
 
 import {
   generatePassphraseFromCredentials,
@@ -45,6 +46,7 @@ export function AuthModal({ id }: { id: string }) {
   const modal = useModal(id);
   const backendUrl = useBackendUrl();
   const config = conf();
+  const navigate = useNavigate();
 
   const { login, register, restore, importData } = useAuth();
   const progressItems = useProgressStore((store) => store.items);
@@ -80,6 +82,7 @@ export function AuthModal({ id }: { id: string }) {
   const [colorA, setColorA] = useState("#E50914");
   const [colorB, setColorB] = useState("#B20710");
   const [userIcon, setUserIcon] = useState<UserIcons>(UserIcons.CAT);
+  const [conflixImage, setConflixImage] = useState<string | null>(null);
 
   // Recaptcha / siteKey fetch
   const [siteKey, setSiteKey] = useState<string | null>(null);
@@ -204,10 +207,12 @@ export function AuthModal({ id }: { id: string }) {
     await restore(accountResult);
 
     setSuccessMessage(`Log in success, welcome back ${validatedUsername}!`);
+    // Always land on the profile selection so the user picks their profile.
+    navigate("/profiles");
     setTimeout(() => {
       handleSuccessOutro();
     }, 1000);
-  }, [username, password, backendUrl, config.BACKEND_URL, login, restore, importData, progressItems, bookmarkItems, modal]);
+  }, [username, password, backendUrl, config.BACKEND_URL, login, restore, importData, progressItems, bookmarkItems, modal, navigate]);
 
   // Login handler with Passkey / Device Scan
   const [passkeyLoginResult, handlePasskeyLogin] = useAsyncFn(async () => {
@@ -262,10 +267,12 @@ export function AuthModal({ id }: { id: string }) {
     await restore(accountResult);
 
     setSuccessMessage("Signed in successfully with Passkey!");
+    // Always land on the profile selection so the user picks their profile.
+    navigate("/profiles");
     setTimeout(() => {
       handleSuccessOutro();
     }, 1000);
-  }, [username, backendUrl, config.BACKEND_URL, login, restore, importData, progressItems, bookmarkItems, modal]);
+  }, [username, backendUrl, config.BACKEND_URL, login, restore, importData, progressItems, bookmarkItems, modal, navigate]);
 
   const { executeRecaptcha } = useGoogleReCaptcha();
 
@@ -309,6 +316,10 @@ export function AuthModal({ id }: { id: string }) {
 
     await importData(accountResult, progressItems, bookmarkItems);
     await restore(accountResult);
+    // Only AFTER registration fully succeeded do we mark this browser as a
+    // fresh signup — so a failed attempt (username taken, network error) can
+    // never leave a stale flag that hides a returning user's real profiles.
+    markNewSignup();
     setAccountNickname(validatedUsername);
 
     setSuccessMessage("Account created successfully!");
@@ -341,6 +352,7 @@ export function AuthModal({ id }: { id: string }) {
       colorA,
       colorB,
       icon: userIcon,
+      image: conflixImage,
     };
 
     await editUser(targetUrl, account, {
@@ -350,10 +362,13 @@ export function AuthModal({ id }: { id: string }) {
     updateProfile(profileObj);
 
     setSuccessMessage("Everything is complete!");
+    // After finishing signup, go to profile selection (kids is pre-created;
+    // the user adds their own profile there).
+    navigate("/profiles");
     setTimeout(() => {
       handleSuccessOutro();
     }, 1000);
-  }, [account, colorA, colorB, userIcon, backendUrl, config.BACKEND_URL, updateProfile, modal]);
+  }, [account, colorA, colorB, userIcon, conflixImage, backendUrl, config.BACKEND_URL, updateProfile, modal, navigate]);
 
   const handleCopyPassphrase = async () => {
     try {
@@ -847,10 +862,11 @@ export function AuthModal({ id }: { id: string }) {
                         className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full blur-2xl opacity-40"
                         style={{ background: colorA }}
                       />
-                      <Avatar
-                        profile={{ colorA, colorB, icon: userIcon }}
+                      <ConflixAvatar
+                        profile={{ colorA, colorB, icon: userIcon, image: conflixImage }}
                         iconClass="text-2xl"
                         sizeClass="w-14 h-14 rounded-2xl shadow-lg flex-shrink-0 border border-white/20"
+                        square
                       />
                       <div className="min-w-0 flex-1 relative z-10">
                         <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Live Preview</p>
@@ -858,10 +874,16 @@ export function AuthModal({ id }: { id: string }) {
                       </div>
                     </div>
 
-                    <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-1 no-scrollbar">
-                      <ColorPicker label="First color" value={colorA} onInput={setColorA} />
-                      <ColorPicker label="Second color" value={colorB} onInput={setColorB} />
-                      <IconPicker label="User icon" value={userIcon} onInput={setUserIcon} />
+                    <div className="max-h-[40vh] overflow-y-auto pr-1 no-scrollbar">
+                      <AvatarPicker
+                        value={{ colorA, colorB, icon: userIcon, image: conflixImage }}
+                        onChange={(v) => {
+                          setColorA(v.colorA);
+                          setColorB(v.colorB);
+                          setUserIcon(v.icon as UserIcons);
+                          setConflixImage(v.image ?? null);
+                        }}
+                      />
                     </div>
 
                     {profileResult.error && (

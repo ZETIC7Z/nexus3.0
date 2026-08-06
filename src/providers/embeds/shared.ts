@@ -334,7 +334,7 @@ export function buildHlsStream(
     skipValidation: true,
     audioTracks: [{
       id: `${id}-audio-original`,
-      label: "Original",
+      label: "🌐 Original",
       language: "und",
       url,
       default: true,
@@ -358,7 +358,7 @@ export function buildFileStream(
     skipValidation: true,
     audioTracks: [{
       id: `${id}-audio-original`,
-      label: "Original",
+      label: "🌐 Original",
       language: "und",
       url: firstUrl,
       default: true,
@@ -388,12 +388,27 @@ const DUB_LANG_MAP: Array<[RegExp, string, string]> = [
   [/\bvietnamese\b/, "Vietnamese Dub", "vi"],
 ];
 
+/** Map ISO language code to country flag emoji. */
+const LANG_FLAG: Record<string, string> = {
+  en: "🇬🇧", es: "🇪🇸", fr: "🇫🇷", de: "🇩🇪", it: "🇮🇹", pt: "🇵🇹",
+  hi: "🇮🇳", ja: "🇯🇵", ko: "🇰🇷", zh: "🇨🇳", ru: "🇷🇺", ar: "🇸🇦",
+  tr: "🇹🇷", th: "🇹🇭", vi: "🇻🇳", id: "🇮🇩", nl: "🇳🇱", pl: "🇵🇱",
+  ro: "🇷🇴", sv: "🇸🇪", el: "🇬🇷", cs: "🇨🇿", hu: "🇭🇺", da: "🇩🇰",
+  fi: "🇫🇮", ta: "🇮🇳", te: "🇮🇳", ml: "🇮🇳", bn: "🇧🇩", ur: "🇵🇰",
+  und: "🌐",
+};
+
+export function flagForLang(lang: string): string {
+  return LANG_FLAG[lang] ?? "🌐";
+}
+
 function dubLanguage(item: EmbedStreamItem): { label: string; language: string } {
   const name = `${item.name ?? ""} ${item.title ?? ""} ${item.server ?? ""}`.toLowerCase();
   for (const [re, label, language] of DUB_LANG_MAP) {
     if (re.test(name)) return { label, language };
   }
-  return { label: "English Dub", language: "en" };
+  // Unknown dub — don't guess "English" when it could be anything.
+  return { label: "Dubbed", language: "und" };
 }
 
 /**
@@ -486,18 +501,19 @@ async function scrapeAnimeEmbed(
       );
 
   if (dubs.length > 0) {
-    // Anime: default is Japanese (sub), dubs are alternatives
+    // Anime: default is Japanese (sub), dubs are alternatives with flags
     const audioTracks: any[] = [
-      { id: `nexus-embed-${backend}-audio-jp`, label: "Japanese", language: "ja", url: best.item.url, default: true },
+      { id: `nexus-embed-${backend}-audio-jp`, label: `🇯🇵 Japanese`, language: "ja", url: best.item.url, default: true },
     ];
     const seen = new Set<string>(["und"]);
     for (const r of dubs) {
       const { label: dubLabel, language } = dubLanguage(r.item);
       if (seen.has(language)) continue;
       seen.add(language);
+      const flag = flagForLang(language);
       audioTracks.push({
         id: `nexus-embed-${backend}-audio-${language}`,
-        label: dubLabel,
+        label: `${flag} ${dubLabel}`,
         language,
         url: r.item.url,
         default: false,
@@ -585,26 +601,34 @@ export function makeStandaloneSource(opts: {
             ? buildHlsStream(best.item.url, `${id}-hls`, captions)
             : buildFileStream({ [best.quality]: { type: "mp4", url: best.item.url } }, `${id}-file`, captions);
 
-          // Anime: default is Japanese (sub), dubs are alternatives
+          // Anime: default is Japanese (sub), dubs are alternatives with flags
           const audioTracks: any[] = [
-            { id: `${id}-audio-jp`, label: "Japanese", language: "ja", url: best.item.url, default: true },
+            { id: `${id}-audio-jp`, label: `🇯🇵 Japanese`, language: "ja", url: best.item.url, default: true },
           ];
           const seen = new Set<string>(["und"]);
           for (const r of dubs) {
             const { label: dl, language } = dubLanguage(r.item);
             if (seen.has(language)) continue;
             seen.add(language);
-            audioTracks.push({ id: `${id}-audio-${language}`, label: dl, language, url: r.item.url, default: false });
+            const flag = flagForLang(language);
+            audioTracks.push({ id: `${id}-audio-${language}`, label: `${flag} ${dl}`, language, url: r.item.url, default: false });
           }
           stream.audioTracks = audioTracks;
           return { embeds: [], stream: [stream] };
         }
 
-        // Return all working servers as numbered embeds so user can pick
+        // Return all working servers as numbered embeds so user can pick.
+        // Pack captions + audio info alongside the URL so the server embed
+        // can build a complete stream with subtitles.
         return {
           embeds: mainPool.map((r, i) => ({
             embedId: `nexus-server-${i + 1}`,
-            url: r.item.url,
+            url: JSON.stringify({
+              url: r.item.url,
+              captions: extractCaptions(r.item, `${id}-srv${i + 1}`),
+              quality: r.quality,
+              label: r.item.server || r.item.title || `Server ${i + 1}`,
+            }),
           })),
           stream: [],
         };

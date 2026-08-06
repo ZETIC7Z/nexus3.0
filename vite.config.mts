@@ -47,14 +47,6 @@ const captioningPackages = [
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
   const serverEnv = loadEnv(mode, process.cwd(), "");
-  // Only use the server-visible absolute MOVIEBOX_API_URL; the Vite-prefixed
-  // client env may contain a relative path that Vite's proxy cannot target.
-  // Fall back to the deployed Vercel API when no local backend is configured.
-  const movieBoxTarget =
-    serverEnv.MOVIEBOX_API_URL?.startsWith("http")
-      ? serverEnv.MOVIEBOX_API_URL
-      : "https://nexus-test-ruby.vercel.app/api/moviebox";
-  const movieBoxSecret = serverEnv.MOVIEBOX_API_SECRET || "";
   return {
     base: env.VITE_BASE_URL || "/",
     define: {
@@ -241,13 +233,6 @@ export default defineConfig(({ mode }) => {
           rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-stream/, ""),
         },
 
-        // ── MovieBox server-side compatibility route ──────────────────────
-        "/api/moviebox": {
-          target: movieBoxTarget,
-          changeOrigin: true,
-          rewrite: (requestPath) => requestPath.replace(/^\/api\/moviebox/, ""),
-          headers: movieBoxSecret ? { "X-NEXUS-SECRET": movieBoxSecret } : {},
-        },
         // ── TMDB — metadata (server-side key, same-origin browser request) ─
         "/api/tmdb": {
           target: "https://api.themoviedb.org",

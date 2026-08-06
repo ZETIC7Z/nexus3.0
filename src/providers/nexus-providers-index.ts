@@ -66,14 +66,29 @@ const makeServerEmbed = (n: number) => makeEmbedContext({
   name: `Server ${n}`,
   rank: 1000 - n,
   async scrape(ctx: any) {
-    const url = (ctx as any).url ?? "";
-    if (!url) throw new Error("No URL");
+    const raw = (ctx as any).url ?? "";
+    if (!raw) throw new Error("No URL");
+    // Decode packed JSON from the standalone source:
+    // { url, captions, quality, label }
+    let url: string = raw;
+    let captions: any[] = [];
+    let label = "Original";
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.url) {
+        url = parsed.url;
+        captions = parsed.captions || [];
+        if (parsed.label) label = parsed.label;
+      }
+    } catch {
+      // plain URL — no extras
+    }
     const isHls = url.includes(".m3u8") || url.includes("m3u8-proxy");
     return {
       embeds: [],
       stream: [isHls
-        ? { id: `srv${n}-hls`, type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions: [], headers: {}, skipValidation: true }
-        : { id: `srv${n}-mp4`, type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions: [], headers: {}, skipValidation: true }
+        ? { id: `srv${n}-hls`, type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language: "und", url, default: true }] }
+        : { id: `srv${n}-mp4`, type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language: "und", url, default: true }] }
       ],
     };
   },

@@ -457,25 +457,35 @@
       "close": "Close"
     },
     "titles": {
-      "day": {
-        "default": "What would you like to watch this afternoon?",
-        "extra": ["Viva la NEXUS!"]
-      },
-      "morning": {
-        "default": "What would you like to watch this morning?",
-        "extra": ["Viva la NEXUS!"]
-      },
-      "night": {
-        "default": "What would you like to watch tonight?",
-        "extra": ["Viva la NEXUS!"]
+      "69": {
+        "default": "What would you like to watch this.. day?",
+        "extra": [
+          "Viva la NEXUS!"
+        ]
       },
       "420": {
         "default": "What would you like to watch this 4/20?",
-        "extra": ["Happy 4/20!"]
+        "extra": [
+          "Happy 4/20!"
+        ]
       },
-      "69": {
-        "default": "What would you like to watch this.. day?",
-        "extra": ["Viva la NEXUS!"]
+      "day": {
+        "default": "What would you like to watch this afternoon?",
+        "extra": [
+          "Viva la NEXUS!"
+        ]
+      },
+      "morning": {
+        "default": "What would you like to watch this morning?",
+        "extra": [
+          "Viva la NEXUS!"
+        ]
+      },
+      "night": {
+        "default": "What would you like to watch tonight?",
+        "extra": [
+          "Viva la NEXUS!"
+        ]
       },
       "halloween": {
         "default": "What spooky movie would you like to watch this Halloween?",
@@ -647,7 +657,8 @@
       "discover": "Discover",
       "freeEmbed": "Free Embed",
       "development": "Development",
-      "desktop": "App Settings"
+      "desktop": "App Settings",
+      "switchProfile": "Switch Profile"
     }
   },
   "notFound": {
@@ -1254,8 +1265,10 @@
         "finish": "Finish editing",
         "firstColor": "Profile color one",
         "secondColor": "Profile color two",
-        "title": "Edit profile picture",
-        "userIcon": "User icon"
+        "title": "Edit Profile",
+        "userIcon": "User icon",
+        "subtitle": "Change the name or avatar — everything stays saved.",
+        "nicknameLabel": "Profile name"
       },
       "register": {
         "title": "Join NEXUS today",
@@ -1541,7 +1554,8 @@
         "genreShows": "{{genre}} Shows",
         "categoryMovies": "{{category}} Movies",
         "categoryShows": "{{category}} Shows",
-        "top10": "Top 10"
+        "top10": "Top 10",
+        "countryPicks": "Top 10 in {{country}}"
       },
       "change": "Change",
       "more": "View more"
@@ -1657,5 +1671,22 @@
     "linkCopied": "Copied!",
     "backendRequirement": "Watch parties need backend version 2.0.1+. Update your backend to use this feature.",
     "activeBackend": "Active Backend: {{backend}}"
+  },
+  "profile": {
+    "select": {
+      "whoIsWatching": "Who's watching?",
+      "addProfile": "Add Profile",
+      "manageProfiles": "Manage Profiles",
+      "signOut": "Sign out"
+    }
+  },
+  "kids": {
+    "welcome": "Welcome to NEXUS Kids! 🎉",
+    "subtitle": "A safe place full of fun movies and shows just for you. Adventure, laughter, and magic await!",
+    "search": "Search kids shows & movies...",
+    "searchResults": "Search Results",
+    "popularMovies": "Popular Movies",
+    "popularTV": "Popular TV Shows",
+    "loading": "Finding great stuff for you..."
   }
 }

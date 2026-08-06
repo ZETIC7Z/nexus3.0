@@ -22,7 +22,7 @@ export function LoginPage() {
       <PageTitle subpage k="global.pages.login" />
       <LoginFormPart
         onLogin={() => {
-          navigate("/");
+          navigate("/profiles");
         }}
       />
     </SubPageLayout>

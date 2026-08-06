@@ -32,6 +32,7 @@ import {
 import { useAuthData } from "@/hooks/auth/useAuthData";
 import { useBackendUrl } from "@/hooks/auth/useBackendUrl";
 import { AccountWithToken, useAuthStore } from "@/stores/auth";
+import { useProfileStore } from "@/stores/profiles";
 import { BookmarkMediaItem } from "@/stores/bookmarks";
 import { ProgressMediaItem } from "@/stores/progress";
 import { sleep } from "@/utils/translation/utils";
@@ -46,6 +47,8 @@ export interface RegistrationData {
       colorA: string;
       colorB: string;
       icon: string;
+      /** Conflix image URL — synced to backend during registration. */
+      image?: string | null;
     };
   };
 }
@@ -276,13 +279,27 @@ export function useAuth() {
           getGroupOrder(backendUrl, account),
         ]);
 
-      // Update account store with fresh user data (including nickname)
+      // Update account store with fresh user data (including nickname).
+      // The backend now stores the Conflix `image` field (added to UserEdit
+      // and RegistrationData), so on a fresh device the backend response
+      // carries the full profile. Still merge local as a fallback in case
+      // the user picked the icon offline or the backend is lagging.
       const { setAccount } = useAuthStore.getState();
       if (account) {
+        const profileStoreMain = useProfileStore
+          .getState()
+          .profiles.find((p) => p.id === "main");
+        const backendImage = user.user.profile.image;
+        const localImage =
+          account.profile?.image ?? profileStoreMain?.profile?.image;
+        const finalImage = backendImage ?? localImage ?? null;
         setAccount({
           ...account,
           nickname: user.user.nickname,
-          profile: user.user.profile,
+          profile: {
+            ...user.user.profile,
+            image: finalImage || undefined,
+          },
         });
       }
 

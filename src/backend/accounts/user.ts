@@ -15,6 +15,8 @@ export interface UserResponse {
     colorA: string;
     colorB: string;
     icon: string;
+    /** Conflix image URL — synced cross-device when the backend stores it. */
+    image?: string | null;
   };
 }
 
@@ -23,6 +25,8 @@ export interface UserEdit {
     colorA: string;
     colorB: string;
     icon: string;
+    /** Conflix image URL — sent to backend so it syncs across devices. */
+    image?: string | null;
   };
   nickname?: string;
 }
