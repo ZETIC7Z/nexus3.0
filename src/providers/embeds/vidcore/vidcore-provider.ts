@@ -6,7 +6,7 @@ import { makeEmbedProvider } from "../shared";
 
 export const vidcoreEmbedProvider = makeEmbedProvider({
   id: "nexus-embed-vidcore",
-  name: "Embeds / VidCore",
+  name: "VidCore",
   rank: 960,
   backend: "vidcore",
 });

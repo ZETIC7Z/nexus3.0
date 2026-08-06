@@ -5,7 +5,7 @@ import { makeEmbedProvider } from "../shared";
 
 export const vidupEmbedProvider = makeEmbedProvider({
   id: "nexus-embed-vidup",
-  name: "Embeds / VidUp",
+  name: "VidUp",
   rank: 940,
   backend: "vidup",
 });

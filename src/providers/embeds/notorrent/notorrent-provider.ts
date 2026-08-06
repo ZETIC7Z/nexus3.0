@@ -6,7 +6,7 @@ import { makeEmbedProvider } from "../shared";
 
 export const notorrentEmbedProvider = makeEmbedProvider({
   id: "nexus-embed-notorrent",
-  name: "Embeds / NoTorrent",
+  name: "NoTorrent",
   rank: 970,
   backend: "notorrent",
 });

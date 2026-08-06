@@ -5,7 +5,7 @@ import { makeEmbedProvider } from "../shared";
 
 export const vidfastEmbedProvider = makeEmbedProvider({
   id: "nexus-embed-vidfast",
-  name: "Embeds / VidFast",
+  name: "VidFast",
   rank: 930,
   backend: "vidfast",
 });
