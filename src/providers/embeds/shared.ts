@@ -22,7 +22,7 @@
 
 import { flags, NotFoundError } from "@nexus/providers";
 
-import { makeEmbedContext } from "../shared/makeProviderContext";
+import { makeEmbedContext, makeProviderContext } from "../shared/makeProviderContext";
 import { ScrapeContext } from "../shared/types";
 
 export const EMBED_API_BASE =
@@ -517,6 +517,35 @@ export function makeEmbedProvider(opts: {
     async scrape(ctx) {
       try {
         const apiUrl = (ctx as any).url ?? "";
+        if (anime) return await scrapeAnimeEmbed(backend, apiUrl, name);
+        return await scrapeMovieTvEmbed(backend, apiUrl, name);
+      } catch (e: any) {
+        console.error(`${name}:`, e?.message ?? e);
+        throw e;
+      }
+    },
+  });
+}
+
+/**
+ * Create a standalone source provider from an embed backend.
+ * Each provider becomes its own source in the player's source list.
+ */
+export function makeStandaloneSource(opts: {
+  id: string;
+  name: string;
+  rank: number;
+  backend: string;
+  anime?: boolean;
+}) {
+  const { id, name, rank, backend, anime } = opts;
+  return makeProviderContext({
+    id,
+    name,
+    rank,
+    async scrape(ctx: any) {
+      try {
+        const apiUrl = buildEmbedUrl(backend, ctx);
         if (anime) return await scrapeAnimeEmbed(backend, apiUrl, name);
         return await scrapeMovieTvEmbed(backend, apiUrl, name);
       } catch (e: any) {
