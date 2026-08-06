@@ -583,11 +583,10 @@ export function makeStandaloneSource(opts: {
           return { embeds: [], stream: [stream] };
         }
 
-        // Return all working servers as embeds so user can pick
-        // First (fastest) auto-scrapes via useSourceScraping
+        // Return all working servers as numbered embeds so user can pick
         return {
-          embeds: mainPool.map((r) => ({
-            embedId: "nexus-server",
+          embeds: mainPool.map((r, i) => ({
+            embedId: `nexus-server-${i + 1}`,
             url: r.item.url,
           })),
           stream: [],

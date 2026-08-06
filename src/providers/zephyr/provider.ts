@@ -229,10 +229,19 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
     // destination proxy. That proxy returns 403 for this CDN, so use the
     // VidFast2-only same-origin stream route instead. The Vite route forwards
     // the request to the configured M3U8 proxy with the required headers.
-    stream.playlist = makeStreamProxyUrl(videoUrl, "m3u8-proxy");
+  stream.playlist = makeStreamProxyUrl(videoUrl, "m3u8-proxy");
   } else {
-    stream.qualities = { unknown: { type: "mp4", url: videoUrl } };
+  stream.qualities = { unknown: { type: "mp4", url: videoUrl } };
   }
+
+  // Mark audio as "Original" — Zephyr's source language varies
+  stream.audioTracks = [{
+    id: "vidfast2-audio-original",
+    label: "Original",
+    language: "und",
+    url: videoUrl,
+    default: true,
+  }];
 
   return { embeds: [], stream: [stream] };
 }

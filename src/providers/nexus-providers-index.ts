@@ -3,8 +3,8 @@
 // ---------------------------------------------------------------------------
 // Sources (shown in the player source list, tried in rank order):
 //   1. Zephyr        — CF Worker + vidfast.vc (movies, TV)
-//   2. NoTorrent     — Stremio aggregator (movies, TV)
-//   3. VidCore       — Supreme/Prime servers (movies, TV)
+//   2. NoTorrent     — Stremio aggregator → Server 1, 2, 3...
+//   3. VidCore       — Supreme/Prime → Server 1, 2...
 //   4. Videasy       — movies, TV
 //   5. VidUp         — movies, TV (moon CDN)
 //   6. VidFast       — movies, TV
@@ -14,6 +14,8 @@
 
 import { vidfast2Provider } from "./zephyr/provider";
 import { makeStandaloneSource } from "./embeds/shared";
+import { makeEmbedContext } from "./shared/makeProviderContext";
+import { flags } from "@nexus/providers";
 import { getHealthyProviders, type ProbeableProvider } from "./provider-health";
 
 // ── Movie / TV sources ──────────────────────────────────────────────────
@@ -49,7 +51,7 @@ export const anikaiSource = makeStandaloneSource({
 // ── Source list (ordered by rank, highest tried first) ──────────────────
 export const nexusCustomProviders = [
   vidfast2Provider,  // 1330 — Zephyr
-  notorrentSource,   // 970  — NoTorrent (Stremio)
+  notorrentSource,   // 970  — NoTorrent
   vidcoreSource,     // 960  — VidCore
   videasySource,     // 950  — Videasy
   vidupSource,       // 940  — VidUp
@@ -58,14 +60,11 @@ export const nexusCustomProviders = [
   anikaiSource,      // 890  — AniKai (anime)
 ] as const;
 
-// Simple pass-through embed for server URLs (already proxied)
-import { makeEmbedContext } from "./shared/makeProviderContext";
-import { flags } from "@nexus/providers";
-
-const serverEmbed = makeEmbedContext({
-  id: "nexus-server",
-  name: "Server",
-  rank: 999,
+// ── Numbered server embeds (for per-provider server selection) ──────────
+const makeServerEmbed = (n: number) => makeEmbedContext({
+  id: `nexus-server-${n}`,
+  name: `Server ${n}`,
+  rank: 1000 - n,
   async scrape(ctx: any) {
     const url = (ctx as any).url ?? "";
     if (!url) throw new Error("No URL");
@@ -73,30 +72,28 @@ const serverEmbed = makeEmbedContext({
     return {
       embeds: [],
       stream: [isHls
-        ? { id: "server-hls", type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions: [], headers: {}, skipValidation: true }
-        : { id: "server-mp4", type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions: [], headers: {}, skipValidation: true }
+        ? { id: `srv${n}-hls`, type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions: [], headers: {}, skipValidation: true }
+        : { id: `srv${n}-mp4`, type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions: [], headers: {}, skipValidation: true }
       ],
     };
   },
 });
 
-export const nexusCustomEmbeds = [serverEmbed] as const;
-export { vidfast2Provider } from "./zephyr/provider";
+export const nexusCustomEmbeds = [
+  makeServerEmbed(1), makeServerEmbed(2), makeServerEmbed(3),
+  makeServerEmbed(4), makeServerEmbed(5), makeServerEmbed(6),
+] as const;
 
+export { vidfast2Provider } from "./zephyr/provider";
 export { getHealthyProviders, getHealthSnapshot, invalidateHealth } from "./provider-health";
 export type { ProviderHealth } from "./provider-health";
-
 export type NexusCustomProvider = (typeof nexusCustomProviders)[number];
 
 export async function getLiveNexusProviders(
   builtinSources: { id: string; name: string }[] = [],
 ): Promise<ProbeableProvider[]> {
   const healthyCustom = await getHealthyProviders(
-    nexusCustomProviders.map((p) => ({
-      id: p.id,
-      name: p.name,
-      disabled: p.disabled,
-    })),
+    nexusCustomProviders.map((p) => ({ id: p.id, name: p.name, disabled: p.disabled })),
   );
   return [...healthyCustom, ...builtinSources];
 }
