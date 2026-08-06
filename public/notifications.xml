@@ -4,7 +4,42 @@
     <title>NEXUS Notifications</title>
     <description>Site updates, feature announcements, and important alerts for NEXUS users</description>
     <language>en</language>
-    <lastBuildDate>Fri, 31 Jul 2026 13:30:00 +08:00</lastBuildDate>
+    <lastBuildDate>Thu, 06 Aug 2026 17:14:00 +0800</lastBuildDate>
+    <item>
+      <guid>nexus-notif-2026-08-06-v30-embeds-kids-country</guid>
+      <title>🎉 NEXUS 3.0 — Providers Overhaul, Kids Profile, Country Top 10 &amp; More!</title>
+      <description>We are thrilled to announce the biggest NEXUS update yet, released today (Aug 6, 2026):
+
+**Provider Overhaul — 8 Flat Sources**
+• Each source now appears individually in the player: Zephyr, NoTorrent, VidCore, Videasy, VidUp, VidFast, AniKoto, AniKai
+• No more nested playlists — one clean, simple source list
+• Numbered Server selection: click a source to see its servers (Server 1, 2, 3...) and pick manually
+• Smart failover: if a server is offline, we automatically try the next server, then the next provider — an error only appears when every provider is exhausted
+• Real latency probing with content validation — geo-blocked or dead servers ("Wrong IP" pages, 403/429) are silently skipped
+
+**Audio &amp; Subtitles**
+• 🌐 "Original" audio label for movies &amp; TV
+• 🇯🇵 Anime defaults to Japanese; dub languages now appear with country flags (🇬🇧 English, 🇪🇸 Spanish, 🇮🇳 Hindi, etc.)
+• English subtitles are auto-enabled by default — just press play
+
+**New Features**
+• 🇵🇭 Country Top 10 on the Discover page — automatically detects your country (api.country.is) and shows the 10 most popular titles in your region
+• 🧒 Kids Profile — dedicated kid-safe browsing with content filtering and route guards
+• 👤 Profile Selection — choose from multiple avatars (including Conflix-style) on the Profile Select screen
+
+**Performance &amp; Cleanup**
+• 4K quality detection &amp; ranking (4K &gt; 1080 &gt; 720 &gt; 480 &gt; 360)
+• Subtitles from the API pass straight through to the player
+• Dead providers removed: VidLink, VixSrc, Nyxos/MovieBox, Strix, Xylos, Vexis, Morvyn
+• Fixed the "Failed to scrape" bug and empty-stream crash
+• All streams play directly in the player — no browser extension needed
+
+Thank you for being part of NEXUS! Happy streaming! 🍿
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Thu, 06 Aug 2026 17:14:00 +0800</pubDate>
+      <category>announcement</category>
+    </item>
     <item>
       <guid>nexus-notif-2026-07-31-kamatera-migration</guid>
       <title>🚀 Server Migration &amp; Bug Fixes Completed!</title>

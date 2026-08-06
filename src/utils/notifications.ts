@@ -273,22 +273,51 @@ export function notifyInfo(title: string, description: string, actionUrl?: strin
 // v3.0 Changelog — auto-posted on first launch after update
 // ---------------------------------------------------------------------------
 
-const V3_CHANGELOG_VERSION = "3.0.0";
+const V3_CHANGELOG_VERSION = "3.1.0";
+
+/** Format the current time in Philippine Standard Time (UTC+8). */
+export function formatPHTime(date: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat("en-PH", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  } catch {
+    return date.toLocaleString();
+  }
+}
 
 export function announceV3Changelog(): void {
   const store = useNotificationStore.getState();
   if (store.lastSeenVersion === V3_CHANGELOG_VERSION) return;
   store.setLastSeenVersion(V3_CHANGELOG_VERSION);
 
+  const phNow = formatPHTime();
+
   store.addNotification({
     type: "info",
-    title: "🎉 NEXUS 3.0 — Major Update",
+    title: `🎉 NEXUS 3.0 — Major Update (${phNow})`,
     description:
-      "8 flat sources with server selection. Country Top 10 on Discover. " +
-      "Kids profile with content filtering. Profile selection with avatars. " +
-      "Audio tracks with country flags. Auto English subtitles. " +
-      "Dead providers cleaned up: VidLink, VixSrc, Nyxos removed. " +
-      "Server failover — next server, next provider, error only at end.",
+      "What's new today:\n" +
+      "• 8 flat sources: Zephyr, NoTorrent, VidCore, Videasy, VidUp, VidFast, AniKoto, AniKai\n" +
+      "• Numbered server selection + smart failover (next server → next source)\n" +
+      "• Real latency probing — dead/geo-blocked servers auto-skipped\n" +
+      "• Audio tracks with country flags: 🇯🇵 Japanese default for anime, dubs selectable\n" +
+      "• Auto English subtitles on by default — just hit play\n" +
+      "• 🇵🇭 Country Top 10 on Discover (api.country.is detection)\n" +
+      "• Kids Profile with content filtering + route guards\n" +
+      "• Profile selection with avatars (AvatarPicker, ConflixAvatar)\n" +
+      "• Subtitle passthrough from API to player captions\n" +
+      "• 4K quality detection & ranking\n" +
+      "• Dead providers removed: VidLink, VixSrc, Nyxos, MovieBox, Strix, Xylos, Vexis, Morvyn\n" +
+      "• “Failed to scrape” bug fixed (empty stream[] truthiness)\n" +
+      "• Everything plays directly — no browser extension needed\n" +
+      `Released: ${phNow}`,
     version: V3_CHANGELOG_VERSION,
     autoDismissMs: 0,
   });
