@@ -332,6 +332,13 @@ export function buildHlsStream(
     captions,
     headers: {},
     skipValidation: true,
+    audioTracks: [{
+      id: `${id}-audio-original`,
+      label: "Original",
+      language: "und",
+      url,
+      default: true,
+    }],
   };
 }
 
@@ -340,6 +347,7 @@ export function buildFileStream(
   id: string,
   captions: any[] = [],
 ): any {
+  const firstUrl = Object.values(qualities)[0]?.url ?? "";
   return {
     id,
     type: "file",
@@ -348,6 +356,13 @@ export function buildFileStream(
     captions,
     headers: {},
     skipValidation: true,
+    audioTracks: [{
+      id: `${id}-audio-original`,
+      label: "Original",
+      language: "und",
+      url: firstUrl,
+      default: true,
+    }],
   };
 }
 
@@ -471,8 +486,9 @@ async function scrapeAnimeEmbed(
       );
 
   if (dubs.length > 0) {
+    // Anime: default is Japanese (sub), dubs are alternatives
     const audioTracks: any[] = [
-      { id: `nexus-embed-${backend}-audio-original`, label: "Original", language: "und", url: best.item.url, default: true },
+      { id: `nexus-embed-${backend}-audio-jp`, label: "Japanese", language: "ja", url: best.item.url, default: true },
     ];
     const seen = new Set<string>(["und"]);
     for (const r of dubs) {
@@ -569,8 +585,9 @@ export function makeStandaloneSource(opts: {
             ? buildHlsStream(best.item.url, `${id}-hls`, captions)
             : buildFileStream({ [best.quality]: { type: "mp4", url: best.item.url } }, `${id}-file`, captions);
 
+          // Anime: default is Japanese (sub), dubs are alternatives
           const audioTracks: any[] = [
-            { id: `${id}-audio-original`, label: "Original", language: "und", url: best.item.url, default: true },
+            { id: `${id}-audio-jp`, label: "Japanese", language: "ja", url: best.item.url, default: true },
           ];
           const seen = new Set<string>(["und"]);
           for (const r of dubs) {
