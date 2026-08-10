@@ -300,27 +300,38 @@ export async function rankStreams(
 }
 
 /**
- * Extract an audio-language label from an embed item. Prefers the title
- * (which carries language info like "Audio Latino" or "Original Audio"),
- * then falls back to the server/name. Returns quality + index as last resort.
+ * Derive a human-readable label for an embed server entry.
+ *
+ * - NoTorrent: extract audio language from title ("Audio Latino" → "Español (Latino)").
+ * - VidCore / VidUp / Videasy / VidFast: show the real server name
+ *   ("Vidcore (Prime)" → "Prime", "VidUp (Orbit)" → "Orbit").
+ * - Anime (AniKoto / AniKai): show sub / dub tag.
+ *
+ * Falls back to quality (1080p / 720p) or a numbered slot.
  */
 export function deriveServerLabel(
   item: EmbedStreamItem,
   index: number,
+  backend?: string,
 ): string {
   const title = (item.title || "").trim();
   const server = (item.server || item.name || "").trim();
   const quality = (item.quality || "").toLowerCase();
 
-  // ── Extract language from title ──────────────────────────────────────
-  const lang = extractLanguage(title);
-  if (lang) return lang;
+  // ── NoTorrent: extract audio language from title ────────────────────
+  if (backend === "notorrent") {
+    const lang = extractLanguage(title);
+    if (lang) return lang;
+    // Try server/name as backup.
+    const serverLang = extractLanguage(server);
+    if (serverLang) return serverLang;
+    // Quality fallback for NoTorrent.
+    const qLabel = qualityToLabel(quality);
+    if (qLabel) return qLabel;
+    return `Audio ${index + 1}`;
+  }
 
-  // ── Extract language from server/name ────────────────────────────────
-  const serverLang = extractLanguage(server);
-  if (serverLang) return serverLang;
-
-  // ── Anime sub/dub pattern ────────────────────────────────────────────
+  // ── Anime providers: show sub / dub tag ─────────────────────────────
   const subDubMatch = (title + " " + server).match(/\((sub|dub|raw)\)/i);
   if (subDubMatch) {
     const tag = subDubMatch[1].toLowerCase();
@@ -329,11 +340,62 @@ export function deriveServerLabel(
     return "Raw";
   }
 
-  // ── Quality fallback ─────────────────────────────────────────────────
-  const qLabel = qualityToLabel(quality);
-  if (qLabel) return qLabel;
+  // ── VidCore / VidUp / Videasy / VidFast: real server name ───────────
+  // "Vidcore (Prime)" → "Prime", "VidUp (Orbit)" → "Orbit".
+  return deriveProviderServerName(server, index);
+}
 
-  return `Audio ${index + 1}`;
+/**
+ * Strip the provider prefix from a server name:
+ * "Vidcore (Prime)"  → "Prime"
+ * "VidUp (Orbit)"    → "Orbit"
+ * "VidFast (Horizon)" → "Horizon"
+ * "Videasy (Euro)"   → "Euro"
+ */
+function deriveProviderServerName(raw: string, index: number): string {
+  if (!raw) return `Server ${index + 1}`;
+  // Strip leading emoji / flags.
+  const noEmoji = stripFlagsAndEmoji(raw)
+    .replace(/\s+/g, " ")
+    .trim();
+  // Extract text inside the first parentheses pair.
+  const m = noEmoji.match(/\(([^)]+)\)/);
+  if (m) {
+    const inner = m[1].trim();
+    if (inner) return inner;
+  }
+  // No parens — return the cleaned raw name as-is.
+  if (noEmoji) return noEmoji;
+  return `Server ${index + 1}`;
+}
+
+/** Map a label back to a BCP-47 language code so hls.js can use it. */
+export function languageCodeFromLabel(label: string, _backend?: string): string {
+  const lower = label.toLowerCase();
+  if (lower.includes("english") || lower === "english" || lower === "1080p" || lower === "720p" || lower === "480p" || lower === "4k") return "en";
+  if (lower.includes("latino") || lower.includes("español") || lower.includes("spanish")) return "es";
+  if (lower.includes("türkçe") || lower.includes("turkish")) return "tr";
+  if (lower.includes("français") || lower.includes("french")) return "fr";
+  if (lower.includes("deutsch") || lower.includes("german")) return "de";
+  if (lower.includes("italiano") || lower.includes("italian")) return "it";
+  if (lower.includes("português") || lower.includes("portuguese")) return "pt";
+  if (lower.includes("日本語") || lower.includes("japanese")) return "ja";
+  if (lower.includes("한국어") || lower.includes("korean")) return "ko";
+  if (lower.includes("العربية") || lower.includes("arabic")) return "ar";
+  if (lower.includes("русский") || lower.includes("russian")) return "ru";
+  if (lower.includes("हिन्दी") || lower.includes("hindi")) return "hi";
+  if (lower.includes("தமிழ்") || lower.includes("tamil")) return "ta";
+  if (lower.includes("తెలుగు") || lower.includes("telugu")) return "te";
+  if (lower.includes("indonesian") || lower.includes("bahasa")) return "id";
+  if (lower.includes("ไทย") || lower.includes("thai")) return "th";
+  if (lower.includes("việt") || lower.includes("vietnamese")) return "vi";
+  if (lower.includes("polski") || lower.includes("polish")) return "pl";
+  if (lower.includes("nederlands") || lower.includes("dutch")) return "nl";
+  if (lower.includes("tagalog")) return "tl";
+  if (lower.includes("বাংলা") || lower.includes("bengali")) return "bn";
+  if (lower.includes("українська") || lower.includes("ukrainian")) return "uk";
+  if (lower.includes("中文") || lower.includes("chinese")) return "zh";
+  return "und";
 }
 
 /** Known language keywords → display label (sorted long-first). */
@@ -808,9 +870,11 @@ export function makeStandaloneSource(opts: {
 
         // Return all working servers as numbered embeds so user can pick.
         // Pack captions + audio info alongside the URL so the server embed
-        // can build a complete stream with subtitles. Labels carry the REAL
-        // server name (Prime / Orbit / Euro …) so the UI never shows "Server N".
-        const labels = mainPool.map((r, i) => deriveServerLabel(r.item, i));
+        // can build a complete stream with subtitles.
+        // - NoTorrent: language labels (English, Español, Türkçe, …)
+        // - VidCore / VidUp / VidFast / Videasy: server names (Prime, Orbit, …)
+        const labels = mainPool.map((r, i) => deriveServerLabel(r.item, i, backend));
+        const langCodes = labels.map((l) => languageCodeFromLabel(l, backend));
         setServerEmbedLabels(labels);
         return {
           embeds: mainPool.map((r, i) => ({
@@ -820,6 +884,7 @@ export function makeStandaloneSource(opts: {
               captions: extractCaptions(r.item, `${id}-srv${i + 1}`),
               quality: r.quality,
               label: labels[i],
+              language: langCodes[i],
             }),
           })),
           stream: [],
