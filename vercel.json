@@ -4,6 +4,10 @@
   "installCommand": "pnpm install",
   "rewrites": [
     {
+      "source": "/api/vidfast2-vc/(.*)",
+      "destination": "/api/vidfast2-vc?path=$1"
+    },
+    {
       "source": "/api/vidfast2-worker/(.*)",
       "destination": "/api/vidfast2-worker?path=$1"
     },
