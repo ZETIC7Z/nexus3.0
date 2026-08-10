@@ -31,42 +31,8 @@ export const EMBED_API_BASE =
     "https://stycanine1-tmdb-embed-api.hf.space"
   ).replace(/\/$/, "");
 
-export const EMBED_REQUEST_TIMEOUT = 12_000;
-export const PROBE_TIMEOUT = 3_500;
-
-// ---------------------------------------------------------------------------
-// Server-name registry — real server names (Prime / Orbit / Horizon / Euro …)
-// written by a standalone source when it ranks its servers, read by the
-// spinner + settings menu so they never show generic "Server N" labels.
-// Keys are the numbered embed ids (nexus-server-1 … nexus-server-6).
-// ---------------------------------------------------------------------------
-const serverLabelCache: Record<string, string> = {};
-
-export function setServerEmbedLabels(labels: string[]): void {
-  labels.forEach((label, i) => {
-    if (label) serverLabelCache[`nexus-server-${i + 1}`] = label;
-  });
-}
-
-export function getServerEmbedLabel(embedId: string): string | undefined {
-  return serverLabelCache[embedId];
-}
-
-/**
- * Read the packed server label from an embed's URL (JSON with a `label`
- * field) so the UI can show the real server name without a registry lookup.
- */
-export function getPackedEmbedLabel(url: string): string | undefined {
-  try {
-    const parsed = JSON.parse(url);
-    if (parsed && typeof parsed.label === "string" && parsed.label) {
-      return parsed.label;
-    }
-  } catch {
-    /* plain URL — no extras */
-  }
-  return undefined;
-}
+export const EMBED_REQUEST_TIMEOUT = 20_000;
+export const PROBE_TIMEOUT = 5_000;
 
 // ---------------------------------------------------------------------------
 // API response shapes
@@ -297,176 +263,6 @@ export async function rankStreams(
     if (a.latency !== null && b.latency !== null) return a.latency - b.latency;
     return 0;
   });
-}
-
-/**
- * Derive a human-readable label for an embed server entry.
- *
- * - NoTorrent: extract audio language from title ("Audio Latino" → "Español (Latino)").
- * - VidCore / VidUp / Videasy / VidFast: show the real server name
- *   ("Vidcore (Prime)" → "Prime", "VidUp (Orbit)" → "Orbit").
- * - Anime (AniKoto / AniKai): show sub / dub tag.
- *
- * Falls back to quality (1080p / 720p) or a numbered slot.
- */
-export function deriveServerLabel(
-  item: EmbedStreamItem,
-  index: number,
-  backend?: string,
-): string {
-  const title = (item.title || "").trim();
-  const server = (item.server || item.name || "").trim();
-  const quality = (item.quality || "").toLowerCase();
-
-  // ── NoTorrent: extract audio language from title ────────────────────
-  if (backend === "notorrent") {
-    const lang = extractLanguage(title);
-    if (lang) return lang;
-    // Try server/name as backup.
-    const serverLang = extractLanguage(server);
-    if (serverLang) return serverLang;
-    // Quality fallback for NoTorrent.
-    const qLabel = qualityToLabel(quality);
-    if (qLabel) return qLabel;
-    return `Audio ${index + 1}`;
-  }
-
-  // ── Anime providers: show sub / dub tag ─────────────────────────────
-  const subDubMatch = (title + " " + server).match(/\((sub|dub|raw)\)/i);
-  if (subDubMatch) {
-    const tag = subDubMatch[1].toLowerCase();
-    if (tag === "dub") return "English (dub)";
-    if (tag === "sub") return "日本語 (sub)";
-    return "Raw";
-  }
-
-  // ── VidCore / VidUp / Videasy / VidFast: real server name ───────────
-  // "Vidcore (Prime)" → "Prime", "VidUp (Orbit)" → "Orbit".
-  return deriveProviderServerName(server, index);
-}
-
-/**
- * Strip the provider prefix from a server name:
- * "Vidcore (Prime)"  → "Prime"
- * "VidUp (Orbit)"    → "Orbit"
- * "VidFast (Horizon)" → "Horizon"
- * "Videasy (Euro)"   → "Euro"
- */
-function deriveProviderServerName(raw: string, index: number): string {
-  if (!raw) return `Server ${index + 1}`;
-  // Strip leading emoji / flags.
-  const noEmoji = stripFlagsAndEmoji(raw)
-    .replace(/\s+/g, " ")
-    .trim();
-  // Extract text inside the first parentheses pair.
-  const m = noEmoji.match(/\(([^)]+)\)/);
-  if (m) {
-    const inner = m[1].trim();
-    if (inner) return inner;
-  }
-  // No parens — return the cleaned raw name as-is.
-  if (noEmoji) return noEmoji;
-  return `Server ${index + 1}`;
-}
-
-/** Map a label back to a BCP-47 language code so hls.js can use it. */
-export function languageCodeFromLabel(label: string, _backend?: string): string {
-  const lower = label.toLowerCase();
-  if (lower.includes("english") || lower === "english" || lower === "1080p" || lower === "720p" || lower === "480p" || lower === "4k") return "en";
-  if (lower.includes("latino") || lower.includes("español") || lower.includes("spanish")) return "es";
-  if (lower.includes("türkçe") || lower.includes("turkish")) return "tr";
-  if (lower.includes("français") || lower.includes("french")) return "fr";
-  if (lower.includes("deutsch") || lower.includes("german")) return "de";
-  if (lower.includes("italiano") || lower.includes("italian")) return "it";
-  if (lower.includes("português") || lower.includes("portuguese")) return "pt";
-  if (lower.includes("日本語") || lower.includes("japanese")) return "ja";
-  if (lower.includes("한국어") || lower.includes("korean")) return "ko";
-  if (lower.includes("العربية") || lower.includes("arabic")) return "ar";
-  if (lower.includes("русский") || lower.includes("russian")) return "ru";
-  if (lower.includes("हिन्दी") || lower.includes("hindi")) return "hi";
-  if (lower.includes("தமிழ்") || lower.includes("tamil")) return "ta";
-  if (lower.includes("తెలుగు") || lower.includes("telugu")) return "te";
-  if (lower.includes("indonesian") || lower.includes("bahasa")) return "id";
-  if (lower.includes("ไทย") || lower.includes("thai")) return "th";
-  if (lower.includes("việt") || lower.includes("vietnamese")) return "vi";
-  if (lower.includes("polski") || lower.includes("polish")) return "pl";
-  if (lower.includes("nederlands") || lower.includes("dutch")) return "nl";
-  if (lower.includes("tagalog")) return "tl";
-  if (lower.includes("বাংলা") || lower.includes("bengali")) return "bn";
-  if (lower.includes("українська") || lower.includes("ukrainian")) return "uk";
-  if (lower.includes("中文") || lower.includes("chinese")) return "zh";
-  return "und";
-}
-
-/** Known language keywords → display label (sorted long-first). */
-const LANG_PATTERNS: [RegExp, string][] = [
-  [/original\s*audio/i, "English"],
-  [/audio\s*latino/i, "Español (Latino)"],
-  [/audio\s*latina/i, "Español (Latino)"],
-  [/audio\s*spanish/i, "Español"],
-  [/audio\s*español/i, "Español"],
-  [/spanish\s*dub/i, "Español (dub)"],
-  [/audio\s*english/i, "English"],
-  [/audio\s*inglés/i, "English"],
-  [/english\s*dub/i, "English (dub)"],
-  [/türkçe/i, "Türkçe"],
-  [/turkish\s*dub/i, "Türkçe (dub)"],
-  [/audio\s*turkish/i, "Türkçe"],
-  [/audio\s*french/i, "Français"],
-  [/french\s*dub/i, "Français (dub)"],
-  [/audio\s*german/i, "Deutsch"],
-  [/german\s*dub/i, "Deutsch (dub)"],
-  [/audio\s*italian/i, "Italiano"],
-  [/italian\s*dub/i, "Italiano (dub)"],
-  [/audio\s*portuguese/i, "Português"],
-  [/portuguese\s*dub/i, "Português (dub)"],
-  [/audio\s*japanese/i, "日本語"],
-  [/japanese\s*dub/i, "日本語 (dub)"],
-  [/audio\s*korean/i, "한국어"],
-  [/korean\s*dub/i, "한국어 (dub)"],
-  [/audio\s*arabic/i, "العربية"],
-  [/audio\s*russian/i, "Русский"],
-  [/audio\s*hindi/i, "हिन्दी"],
-  [/audio\s*tamil/i, "தமிழ்"],
-  [/audio\s*telugu/i, "తెలుగు"],
-  [/audio\s*indonesian/i, "Bahasa Indonesia"],
-  [/audio\s*thai/i, "ไทย"],
-  [/audio\s*vietnamese/i, "Tiếng Việt"],
-  [/audio\s*polish/i, "Polski"],
-  [/audio\s*dutch/i, "Nederlands"],
-  [/audio\s*tagalog/i, "Tagalog"],
-  [/audio\s*bengali/i, "বাংলা"],
-  [/audio\s*ukrainian/i, "Українська"],
-  [/audio\s*chinese/i, "中文"],
-];
-
-function stripFlagsAndEmoji(s: string): string {
-  // eslint-disable-next-line no-misleading-character-class
-  return s.replace(/[\u{1F1E0}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}\u{200B}-\u{200F}\u{2028}-\u{202F}\u{205F}-\u{206F}]/gu, "");
-}
-
-function extractLanguage(text: string): string | null {
-  if (!text) return null;
-  // Strip emoji, trailing tags, and newlines for cleaner matching.
-  const clean = stripFlagsAndEmoji(text)
-    .replace(/\[FREE\]|\[FREE TRIAL\]/gi, "")
-    .replace(/\n.*$/m, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  for (const [pattern, label] of LANG_PATTERNS) {
-    if (pattern.test(clean)) return label;
-  }
-  return null;
-}
-
-function qualityToLabel(q: string): string | null {
-  if (!q || q === "unknown") return null;
-  if (q === "4k" || q === "2160") return "4K";
-  if (q === "1080") return "1080p";
-  if (q === "720") return "720p";
-  if (q === "480") return "480p";
-  if (q === "360") return "360p";
-  return `${q}p`;
 }
 
 export function pickUsable(ranked: RankedStream[]): RankedStream[] {
@@ -764,41 +560,6 @@ export function makeEmbedProvider(opts: {
 }
 
 /**
- * NoTorrent — the TMDB-Embed API backend for notorrent (addon-osvh.onrender.com)
- * is suspended and always returns 0 streams. Instead we query the public
- * NoTorrent Stremio addon directly through the same-origin /api/notorrent
- * proxy (Vercel function in prod, Vite middleware in dev), which resolves the
- * addon's /redirect 302s server-side and returns final playable URLs.
- */
-async function scrapeNotorrentItems(ctx: any): Promise<EmbedStreamItem[]> {
-  const media = ctx.media;
-  const id = media?.imdbId;
-  // The addon needs an IMDb id — without one we can't query it.
-  if (!id) return [];
-  const type = media.type === "movie" ? "movie" : "series";
-  const params = new URLSearchParams({ type, id });
-  if (media.type === "show" && media.season && media.episode) {
-    params.set("season", String(media.season.number));
-    params.set("episode", String(media.episode.number));
-  }
-  const res = await fetch(`/api/notorrent?${params.toString()}`, {
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(EMBED_REQUEST_TIMEOUT),
-  });
-  if (!res.ok) return [];
-  const json: EmbedApiResponse = await res.json();
-  if (!json?.success) return [];
-  return (json.streams ?? []).map((s) => ({
-    name: s.name,
-    server: s.server || s.name,
-    title: s.title,
-    url: s.url,
-    quality: s.quality || "unknown",
-    type: s.type,
-  }));
-}
-
-/**
  * Create a standalone source provider from an embed backend.
  * Each provider becomes its own source in the player's source list.
  */
@@ -816,21 +577,9 @@ export function makeStandaloneSource(opts: {
     rank,
     async scrape(ctx: any) {
       try {
-        // NoTorrent is special — its embed-API backend is dead, so query the
-        // public Stremio addon directly (falls back to the embed API on empty).
-        let items: EmbedStreamItem[] = [];
-        if (backend === "notorrent") {
-          items = await scrapeNotorrentItems(ctx);
-          if (items.length === 0) {
-            const apiUrl = buildEmbedUrl(backend, ctx);
-            const data = await fetchEmbedApi(apiUrl);
-            items = data.streams ?? [];
-          }
-        } else {
-          const apiUrl = buildEmbedUrl(backend, ctx);
-          const data = await fetchEmbedApi(apiUrl);
-          items = data.streams ?? [];
-        }
+        const apiUrl = buildEmbedUrl(backend, ctx);
+        const data = await fetchEmbedApi(apiUrl);
+        const items = data.streams ?? [];
         if (items.length === 0) throw new NotFoundError(`${name}: no sources`);
 
         const ranked = await rankStreams(items);
@@ -871,11 +620,6 @@ export function makeStandaloneSource(opts: {
         // Return all working servers as numbered embeds so user can pick.
         // Pack captions + audio info alongside the URL so the server embed
         // can build a complete stream with subtitles.
-        // - NoTorrent: language labels (English, Español, Türkçe, …)
-        // - VidCore / VidUp / VidFast / Videasy: server names (Prime, Orbit, …)
-        const labels = mainPool.map((r, i) => deriveServerLabel(r.item, i, backend));
-        const langCodes = labels.map((l) => languageCodeFromLabel(l, backend));
-        setServerEmbedLabels(labels);
         return {
           embeds: mainPool.map((r, i) => ({
             embedId: `nexus-server-${i + 1}`,
@@ -883,8 +627,7 @@ export function makeStandaloneSource(opts: {
               url: r.item.url,
               captions: extractCaptions(r.item, `${id}-srv${i + 1}`),
               quality: r.quality,
-              label: labels[i],
-              language: langCodes[i],
+              label: r.item.server || r.item.title || `Server ${i + 1}`,
             }),
           })),
           stream: [],
@@ -950,4 +693,32 @@ export async function detectIsAnime(media: ScrapeContext["media"]): Promise<bool
     /* best-effort — fall through to not-anime */
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Server-name registry — server names packed by standalone sources so the
+// UI can show real names without re-deriving them.
+// ---------------------------------------------------------------------------
+const serverLabelCache: Record<string, string> = {};
+
+export function setServerEmbedLabels(labels: string[]): void {
+  labels.forEach((label, i) => {
+    if (label) serverLabelCache[`nexus-server-${i + 1}`] = label;
+  });
+}
+
+export function getServerEmbedLabel(embedId: string): string | undefined {
+  return serverLabelCache[embedId];
+}
+
+export function getPackedEmbedLabel(url: string): string | undefined {
+  try {
+    const parsed = JSON.parse(url);
+    if (parsed && typeof parsed.label === "string" && parsed.label) {
+      return parsed.label;
+    }
+  } catch {
+    /* plain URL — no extras */
+  }
+  return undefined;
 }

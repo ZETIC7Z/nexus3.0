@@ -3,13 +3,12 @@
 // ---------------------------------------------------------------------------
 // Sources (shown in the player source list, tried in rank order):
 //   1. Zephyr        — CF Worker + vidfast.vc (movies, TV)
-//   2. NoTorrent     — Stremio aggregator → Server 1, 2, 3...
-//   3. VidCore       — Supreme/Prime → Server 1, 2...
-//   4. Videasy       — movies, TV
-//   5. VidUp         — movies, TV (moon CDN)
-//   6. VidFast       — movies, TV
-//   7. AniKoto       — anime, dub support
-//   8. AniKai        — anime, sub only
+//   2. VidCore       — Supreme/Prime → Server 1, 2...
+//   3. Videasy       — movies, TV
+//   4. VidUp         — movies, TV (moon CDN)
+//   5. VidFast       — movies, TV
+//   6. AniKoto       — anime, dub support
+//   7. AniKai        — anime, sub only
 // ---------------------------------------------------------------------------
 
 import { vidfast2Provider } from "./zephyr/provider";
@@ -19,10 +18,6 @@ import { flags } from "@nexus/providers";
 import { getHealthyProviders, type ProbeableProvider } from "./provider-health";
 
 // ── Movie / TV sources ──────────────────────────────────────────────────
-export const notorrentSource = makeStandaloneSource({
-  id: "nexus-notorrent", name: "NoTorrent", rank: 970, backend: "notorrent",
-});
-
 export const vidcoreSource = makeStandaloneSource({
   id: "nexus-vidcore", name: "VidCore", rank: 960, backend: "vidcore",
 });
@@ -51,7 +46,6 @@ export const anikaiSource = makeStandaloneSource({
 // ── Source list (ordered by rank, highest tried first) ──────────────────
 export const nexusCustomProviders = [
   vidfast2Provider,  // 1330 — Zephyr
-  notorrentSource,   // 970  — NoTorrent
   vidcoreSource,     // 960  — VidCore
   videasySource,     // 950  — Videasy
   vidupSource,       // 940  — VidUp
@@ -69,18 +63,16 @@ const makeServerEmbed = (n: number) => makeEmbedContext({
     const raw = (ctx as any).url ?? "";
     if (!raw) throw new Error("No URL");
     // Decode packed JSON from the standalone source:
-    // { url, captions, quality, label, language }
+    // { url, captions, quality, label }
     let url: string = raw;
     let captions: any[] = [];
     let label = "Original";
-    let language = "und";
     try {
       const parsed = JSON.parse(raw);
       if (parsed.url) {
         url = parsed.url;
         captions = parsed.captions || [];
         if (parsed.label) label = parsed.label;
-        if (parsed.language) language = parsed.language;
       }
     } catch {
       // plain URL — no extras
@@ -89,8 +81,8 @@ const makeServerEmbed = (n: number) => makeEmbedContext({
     return {
       embeds: [],
       stream: [isHls
-        ? { id: `srv${n}-hls`, type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language, url, default: true }] }
-        : { id: `srv${n}-mp4`, type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language, url, default: true }] }
+        ? { id: `srv${n}-hls`, type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language: "und", url, default: true }] }
+        : { id: `srv${n}-mp4`, type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language: "und", url, default: true }] }
       ],
     };
   },
