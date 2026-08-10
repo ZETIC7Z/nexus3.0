@@ -181,8 +181,8 @@ export default async function handler(req, res) {
       const next = location ? new URL(location, currentUrl).toString() : null;
       await upstream.arrayBuffer().catch(() => {}); // drain
       if (!next || !isAllowedMediaUrl(next)) {
-        upstream = new Response("Forbidden", { status: 403 });
-        break;
+        res.status(403).send("Forbidden");
+        return;
       }
       currentUrl = next;
     }

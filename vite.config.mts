@@ -243,7 +243,16 @@ export default defineConfig(({ mode }) => {
         "/api/vidfast2-stream": {
           target: "https://pstream.dovetechnology.org",
           changeOrigin: true,
-          rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-stream/, ""),
+          rewrite: (requestPath: string) => {
+            const withoutBase = requestPath.replace(/^\/api\/vidfast2-stream/, "");
+            const spMatch = withoutBase.match(/^\?sp=([^&]+)(.*)/);
+            if (spMatch) {
+              const kind = decodeURIComponent(spMatch[1]);
+              const rest = spMatch[2];
+              return "/" + kind + (rest ? rest.replace(/^&/, "?") : "");
+            }
+            return withoutBase;
+          },
         },
 
         // ── TMDB — metadata (server-side key, same-origin browser request) ─

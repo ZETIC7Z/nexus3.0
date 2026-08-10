@@ -54,7 +54,7 @@ function workerUrl(ep: string): string {
 }
 
 function makeStreamProxyUrl(url: string, kind: "m3u8-proxy" | "ts-proxy"): string {
-  const params = new URLSearchParams({ url });
+  const params = new URLSearchParams({ sp: kind, url });
   params.set(
     "headers",
     JSON.stringify({
@@ -62,7 +62,7 @@ function makeStreamProxyUrl(url: string, kind: "m3u8-proxy" | "ts-proxy"): strin
       Origin: "https://vidfast.vc",
     }),
   );
-  return `${STREAM_PROXY}/${kind}?${params.toString()}`;
+  return `${STREAM_PROXY}?${params.toString()}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -90,7 +90,7 @@ const makeServerEmbed = (n: number) => makeEmbedContext({
     // This avoids the broken destination proxy (getLoadbalancedProxyUrl)
     // and works on all browsers including mobile native HLS.
     const playlistUrl = isHls && !url.includes("m3u8-proxy") && !url.includes("/api/vidfast2-stream")
-      ? `/api/vidfast2-stream/m3u8-proxy?url=${encodeURIComponent(url)}`
+      ? `/api/vidfast2-stream?sp=m3u8-proxy&url=${encodeURIComponent(url)}`
       : url;
     return {
       embeds: [],
