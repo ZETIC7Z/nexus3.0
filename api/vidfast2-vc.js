@@ -2,18 +2,19 @@
 // Vercel serverless function — transparent proxy to vidfast.vc with browser headers.
 // Upstream: https://vidfast.vc
 //
-// The Zephyr provider routes ALL raw vidfast.vc calls through this endpoint
-// (replacing the old CF Worker /vc-proxy route, which the updated worker no
-// longer exposes). The Vite dev server proxies /api/vidfast2-vc with the same
-// headers, so this path works identically locally and in production.
+// Uses the SAME minimal headers as the Vite dev proxy, which works locally.
+// The previous full browser-emulation header set was getting 403'd by
+// Cloudflare (likely flagged as bot traffic from datacenter IPs).
 
 const UPSTREAM = "https://vidfast.vc";
+
+const BROWSER_UA =
+  "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36";
 
 export default async function handler(req, res) {
   // Accept both query-param (?path=movie/603) and path-style (/movie/603).
   let rawPath = req.query?.path || "";
   if (!rawPath) {
-    // Strip the function route prefix to get the upstream path.
     rawPath = (req.url || "").replace(/^.*?\/api\/vidfast2-vc\/?/, "");
   }
   const path = rawPath.replace(/^\/+|\/+$/g, "");
@@ -28,31 +29,18 @@ export default async function handler(req, res) {
   const qs = params.toString();
   const targetUrl = `${UPSTREAM}/${path}${qs ? "?" + qs : ""}`;
 
-  // Inject full browser-emulation headers to bypass Cloudflare
+  // Minimal headers matching the Vite dev proxy (known to work):
   const headers = {
-    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Cache-Control": "no-cache",
-    Pragma: "no-cache",
-    "Sec-CH-UA": '"Chromium";v="137", "Google Chrome";v="137"',
-    "Sec-CH-UA-Mobile": "?0",
-    "Sec-CH-UA-Platform": '"Windows"',
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Upgrade-Insecure-Requests": "1",
-    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
     Referer: "https://vidfast.vc/",
+    "User-Agent": BROWSER_UA,
     "X-Requested-With": "XMLHttpRequest",
   };
+
+  // Forward Content-Type + X-CSRF-Token from the client.
   const reqCt = req.headers && req.headers["content-type"];
   if (reqCt) {
     headers["Content-Type"] = Array.isArray(reqCt) ? reqCt[0] : reqCt;
   }
-  // vidfast.vc's API requires the X-CSRF-Token returned by /route-config.
-  // Forward whatever the client sends (the Zephyr provider attaches it).
   const csrf = req.headers && req.headers["x-csrf-token"];
   if (csrf) {
     headers["X-CSRF-Token"] = Array.isArray(csrf) ? csrf[0] : csrf;
