@@ -209,7 +209,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // ── VidFast 2 — Cloudflare Worker (encryption toolkit) ──────────
         "/api/vidfast2-worker": {
-          target: "https://vidfast.yogeshkumarjamre1.workers.dev",
+          target: "https://vidfast.samxerz12.workers.dev",
           changeOrigin: true,
           rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-worker/, ""),
         },
