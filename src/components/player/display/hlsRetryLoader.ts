@@ -75,6 +75,7 @@ const VIDFAST2_CDN_HOSTS = [
   "moon.ironwallnet.net",
   "housestrong.site",
   "palesquare.top",
+  "polarcandy.top",
 ];
 
 function isVidfast2CdnUrl(url: string): boolean {

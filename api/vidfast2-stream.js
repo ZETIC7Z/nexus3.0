@@ -130,13 +130,16 @@ export default async function handler(req, res) {
     return;
   }
 
-  const streamUrl = req.query?.url;
+  // Vercel rewrites may drop original query params, so fall back to parsing req.url.
+  const rawQuery = ((req.url || "").split("?")[1] || "");
+  const rawParams = new URLSearchParams(rawQuery);
+  const streamUrl = req.query?.url || rawParams.get("url") || "";
   if (!streamUrl || !isAllowedMediaUrl(streamUrl)) {
     res.status(403).send("Media host is not allowed");
     return;
   }
 
-  const queryHeaders = req.query?.headers || null;
+  const queryHeaders = req.query?.headers || rawParams.get("headers") || null;
 
   const headers = {
     Accept: "*/*",
