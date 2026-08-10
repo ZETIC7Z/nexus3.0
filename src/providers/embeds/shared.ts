@@ -802,33 +802,38 @@ export function makeStandaloneSource(opts: {
           return { embeds: [], stream: [stream] };
         }
 
-        // For NoTorrent: return each language as its own embed so user can pick.
-        // Non-English streams become additional audio tracks on the English embed.
-        // For other providers: return servers as embeds with real server names.
+        // For NoTorrent: only keep English servers, label them "Server1 Eng", etc.
+        // Remove non-English (Latino, Türkçe, Hindi, etc.) entirely.
         const labels = mainPool.map((r, i) => deriveServerLabel(r.item, i, backend));
         setServerEmbedLabels(labels);
 
         if (backend === "notorrent") {
-          // Split: English first, then other languages as embeds with audio info.
-          const engIdx = labels.findIndex((l: string) =>
-            l.toLowerCase().includes("english") || l === "1080p" || l === "720p"
-          );
-          const ordered = engIdx >= 0
-            ? [mainPool[engIdx], ...mainPool.filter((_, i) => i !== engIdx)]
-            : mainPool;
-          const orderedLabels = engIdx >= 0
-            ? [labels[engIdx], ...labels.filter((_, i) => i !== engIdx)]
-            : labels;
+          // Filter: only English servers (label includes "english" or is quality-only).
+          const englishPool: typeof mainPool = [];
+          const englishLabels: string[] = [];
+          for (let i = 0; i < mainPool.length; i++) {
+            const l = labels[i].toLowerCase();
+            if (
+              l.includes("english") ||
+              l === "1080p" || l === "720p" || l === "480p" || l === "4k" || l === "360p"
+            ) {
+              englishPool.push(mainPool[i]);
+              englishLabels.push(`Server${englishPool.length} Eng`);
+            }
+          }
+          if (englishPool.length === 0) {
+            throw new NotFoundError(`${name}: no English servers`);
+          }
 
           return {
-            embeds: ordered.map((r, i) => ({
+            embeds: englishPool.map((r, i) => ({
               embedId: `nexus-server-${i + 1}`,
               url: JSON.stringify({
                 url: r.item.url,
                 captions: extractCaptions(r.item, `${id}-srv${i + 1}`),
                 quality: r.quality,
-                label: orderedLabels[i],
-                language: languageCodeFromLabel(orderedLabels[i]),
+                label: englishLabels[i],
+                language: "en",
               }),
             })),
             stream: [],

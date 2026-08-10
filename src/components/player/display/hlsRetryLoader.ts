@@ -67,6 +67,35 @@ const MAX_RETRIES = 12;
 const BASE_DELAY = 250;
 const MAX_DELAY = 3000;
 
+// Embed CDN hosts — EXT-X-MAP init segments on these hosts require a Referer
+// and will 403 through the generic proxy. Route through the embed backend's
+// /ts-proxy which attaches the proper Referer and serves CORS `*`.
+const EMBED_RAW_CDN_HOSTS = ["paperzebra.top"];
+const EMBED_PROXY_BASE = "https://stycanine1-tmdb-embed-api.hf.space";
+
+function rewriteRawEmbedCdnUrl(url: string): string | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname;
+    const isRawEmbedHost = EMBED_RAW_CDN_HOSTS.some(
+      (h) => host === h || host.endsWith(`.${h}`),
+    );
+    if (!isRawEmbedHost) return null;
+    const params = new URLSearchParams({ url });
+    params.set(
+      "headers",
+      JSON.stringify({
+        Referer: "https://vidcore.net/",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+      }),
+    );
+    return `${EMBED_PROXY_BASE}/ts-proxy?${params.toString()}`;
+  } catch {
+    return null;
+  }
+}
+
 // VidFast2 / Zephyr CDN hosts — these serve segments that require a
 // Referer of https://vidfast.vc/ and will 403 through the generic proxy.
 // Route them through the same-origin /api/vidfast2-stream/ts-proxy.
@@ -115,6 +144,15 @@ export class ArtemisRetryLoader extends DefaultLoader {
       params.set("headers", JSON.stringify({ Referer: "https://vidfast.vc/", Origin: "https://vidfast.vc" }));
       context.url = `/api/vidfast2-stream/ts-proxy?${params.toString()}`;
       url = context.url;
+    }
+
+    // Embed CDN init segments (paperzebra.top): route through embed ts-proxy.
+    if (!isVidfast2CdnUrl(url)) {
+      const embedProxied = rewriteRawEmbedCdnUrl(url);
+      if (embedProxied) {
+        context.url = embedProxied;
+        url = embedProxied;
+      }
     }
 
     if (
