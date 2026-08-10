@@ -10,7 +10,13 @@
 const UPSTREAM = "https://vidfast.vc";
 
 export default async function handler(req, res) {
-  const path = (req.query?.path || "").replace(/^\/+|\/+$/g, "");
+  // Accept both query-param (?path=movie/603) and path-style (/movie/603).
+  let rawPath = req.query?.path || "";
+  if (!rawPath) {
+    // Strip the function route prefix to get the upstream path.
+    rawPath = (req.url || "").replace(/^.*?\/api\/vidfast2-vc\/?/, "");
+  }
+  const path = rawPath.replace(/^\/+|\/+$/g, "");
   if (!path) { res.status(400).send("Missing path"); return; }
 
   // Rebuild upstream URL — forward ALL query params except "path"

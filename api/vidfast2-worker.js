@@ -5,7 +5,12 @@
 const UPSTREAM = "https://vidfast.samxerz-zeticuz.workers.dev";
 
 export default async function handler(req, res) {
-  const path = (req.query?.path || "").replace(/^\/+|\/+$/g, "");
+  // Accept both query-param (?path=route-config) and path-style (/route-config).
+  let rawPath = req.query?.path || "";
+  if (!rawPath) {
+    rawPath = (req.url || "").replace(/^.*?\/api\/vidfast2-worker\/?/, "");
+  }
+  const path = rawPath.replace(/^\/+|\/+$/g, "");
   if (!path) { res.status(400).send("Missing path"); return; }
 
   // Rebuild upstream URL — forward ALL query params except "path"
