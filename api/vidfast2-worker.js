@@ -5,29 +5,35 @@
 const UPSTREAM = "https://vidfast.samxerz-zeticuz.workers.dev";
 
 export default async function handler(req, res) {
-  // Extract the worker endpoint from the URL pathname (ignore query params).
+  // Extract the worker endpoint from the URL pathname.
   // /api/vidfast2-worker/route-config  →  route-config
   // /api/vidfast2-worker/vc-proxy      →  vc-proxy
-  // /api/vidfast2-worker?path=generate →  generate (legacy query-param style)
-  let rawPath = (req.url || "")
+  const fullUrl = req.url || "";
+  const qIndex = fullUrl.indexOf("?");
+  const pathname = qIndex >= 0 ? fullUrl.slice(0, qIndex) : fullUrl;
+  const rawQuery = qIndex >= 0 ? fullUrl.slice(qIndex + 1) : "";
+
+  let rawPath = pathname
     .replace(/^.*?\/api\/vidfast2-worker\/?/, "")
-    .split("?")[0]  // strip query string, we rebuild from req.query
     .replace(/^\/+|\/+$/g, "");
 
-  // Fallback: legacy ?path= style
+  // Fallback: legacy ?path= style from old Vercel rewrite (no longer used)
   if (!rawPath && req.query?.path) {
     rawPath = Array.isArray(req.query.path) ? req.query.path[0] : req.query.path;
   }
 
   if (!rawPath) { res.status(400).send("Missing path"); return; }
 
-  // Rebuild upstream URL — forward ALL query params from the incoming request
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(req.query || {})) {
-    for (const item of Array.isArray(v) ? v : [v]) params.append(k, item);
+  // Parse query params manually from the URL. Vercel's req.query may not
+  // be populated for path-style URLs, and we need to forward params as-is.
+  const upstreamUrl = new URL(`${UPSTREAM}/${rawPath}`);
+  if (rawQuery) {
+    // Parse incoming query string and forward all params to the worker
+    const qp = new URLSearchParams(rawQuery);
+    for (const [k, v] of qp) {
+      upstreamUrl.searchParams.append(k, v);
+    }
   }
-  const qs = params.toString();
-  const targetUrl = `${UPSTREAM}/${rawPath}${qs ? "?" + qs : ""}`;
 
   // Forward headers (strip host to avoid routing issues)
   const headers = {};
@@ -43,7 +49,7 @@ export default async function handler(req, res) {
       body = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
     }
 
-    const upstream = await fetch(targetUrl, {
+    const upstream = await fetch(upstreamUrl.toString(), {
       method: req.method || "GET",
       headers,
       body,
