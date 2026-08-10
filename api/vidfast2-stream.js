@@ -69,9 +69,9 @@ function isAllowedMediaUrl(value) {
 }
 
 function makeProxyUrl(url, kind, queryHeaders) {
-  const params = new URLSearchParams({ url });
+  const params = new URLSearchParams({ sp: kind, url });
   if (queryHeaders) params.set("headers", queryHeaders);
-  return `/api/vidfast2-stream/${kind}?${params.toString()}`;
+  return `/api/vidfast2-stream?${params.toString()}`;
 }
 
 function rewriteUriAttribute(line, baseUrl, queryHeaders) {
