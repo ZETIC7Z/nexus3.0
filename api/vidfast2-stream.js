@@ -147,7 +147,7 @@ export default async function handler(req, res) {
   const queryHeaders = req.query?.headers || rawParams.get("headers") || null;
 
   // Default: neutral headers. Override with queryHeaders if provided.
-  const headers: any = {
+  const headers = {
     Accept: "*/*",
     "User-Agent": BROWSER_UA,
   };
