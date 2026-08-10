@@ -24,8 +24,6 @@ export default async function handler(req, res) {
   // Rebuild upstream URL — forward ALL query params from the incoming request
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(req.query || {})) {
-    // For legacy ?path= style, don't duplicate the path param
-    if (k === "path" && !rawPath.includes("?")) continue;
     for (const item of Array.isArray(v) ? v : [v]) params.append(k, item);
   }
   const qs = params.toString();
