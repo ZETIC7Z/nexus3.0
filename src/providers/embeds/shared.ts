@@ -306,10 +306,23 @@ function deriveNotorrentLabel(title: string, server: string, quality: string, in
   return `Audio ${index + 1}`;
 }
 
+function stripEmoji(text: string): string {
+  return Array.from(text)
+    .filter((char) => {
+      const code = char.codePointAt(0) ?? 0;
+      return !(
+        (code >= 0x1f300 && code <= 0x1faff) ||
+        (code >= 0x2600 && code <= 0x27bf) ||
+        code === 0xfe0f ||
+        code === 0x200d
+      );
+    })
+    .join("");
+}
+
 function deriveProviderServerName(raw: string, index: number): string {
   if (!raw) return `Server ${index + 1}`;
-  const noEmoji = raw
-    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, "")
+  const noEmoji = stripEmoji(raw)
     .replace(/\s+/g, " ")
     .trim();
   const m = noEmoji.match(/\(([^)]+)\)/);
@@ -375,8 +388,7 @@ const LANG_PATTERNS: [RegExp, string][] = [
 
 function extractLanguage(text: string): string | null {
   if (!text) return null;
-  const clean = text
-    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, "")
+  const clean = stripEmoji(text)
     .replace(/\[FREE\]|\[FREE TRIAL\]/gi, "")
     .replace(/\n.*$/m, "")
     .replace(/\s+/g, " ")

@@ -24,7 +24,7 @@ const ADDON = "https://addon.notorrent2.workers.dev";
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
 
-const MAX_STREAMS = 8; // resolve at most this many redirects (parallel)
+const MAX_STREAMS = 6; // enough English server choices without slow/locked duplicates
 const REDIRECT_TIMEOUT = 6000;
 const REDIRECT_HOPS = 4;
 
@@ -109,6 +109,24 @@ async function resolveRedirect(url) {
   return null;
 }
 
+function isEnglishStream(stream) {
+  const text = `${stream?.name ?? ""} ${stream?.title ?? ""}`.toLowerCase();
+  // NoTorrent mixes original English with Latino/Castellano/Turkish and
+  // paid MultiLang entries. Keep only an explicitly original/English track.
+  if (/(latino|castellano|spanish|español|portuguese|português|türkçe|turkish|hindi|french|german|italian|arabic|russian|korean|japanese|multi\s*lang|multistream|dubbed)/i.test(text)) {
+    return false;
+  }
+  return /original\s*audio|english\s*(audio|dub)|audio\s*english/i.test(text);
+}
+
+function isPlayableFinalUrl(value) {
+  if (!isAllowedUrl(value)) return false;
+  const lower = value.toLowerCase();
+  // The addon can redirect trial/locked entries to a generic premium video.
+  if (lower.includes("premium.mp4") || lower.includes("paypal") || lower.includes("hostingersite.com")) return false;
+  return true;
+}
+
 function qualityFromName(name) {
   const text = `${name ?? ""}`.toLowerCase();
   if (/(4k|2160|uhd)/.test(text)) return "4k";
@@ -165,7 +183,8 @@ export async function handleNotorrentRequest(req, res) {
 
   let addonUrl;
   if (type === "series" && season && episode) {
-    addonUrl = `${ADDON}/stream/series/${id}/${season}/${episode}.json`;
+    // NoTorrent's Stremio route uses the compact IMDb:season:episode form.
+    addonUrl = `${ADDON}/stream/series/${id}:${season}:${episode}.json`;
   } else if (type === "movie") {
     addonUrl = `${ADDON}/stream/movie/${id}.json`;
   } else {
@@ -192,9 +211,11 @@ export async function handleNotorrentRequest(req, res) {
     const data = await jsonRes.json();
     const raw = Array.isArray(data?.streams) ? data.streams : [];
 
-    // Keep only streams with a real playable URL (skip locked / paypal ones).
+    // Keep only real, explicitly English streams. Resolve several in parallel
+    // so the UI can expose Server1 Eng / Server2 Eng / Server3 Eng and the
+    // player can fail over quickly when one signed CDN URL is dead.
     const candidates = raw
-      .filter((s) => s && s.url && !s.externalUrl)
+      .filter((s) => s && s.url && !s.externalUrl && isEnglishStream(s))
       .slice(0, MAX_STREAMS);
 
     const resolved = await Promise.all(
@@ -204,19 +225,22 @@ export async function handleNotorrentRequest(req, res) {
       })),
     );
 
-    const streams = resolved
-      .filter((r) => r.finalUrl)
-      .map((r) => {
-        const name = cleanName(r.raw.name || r.raw.title || "");
-        return {
-          name,
-          server: name,
-          title: r.raw.title || name,
-          url: r.finalUrl,
-          quality: qualityFromName(`${r.raw.name} ${r.raw.title}`),
-          type: /\.m3u8/i.test(r.finalUrl) ? "hls" : "mp4",
-        };
+    const streams = [];
+    const seenUrls = new Set();
+    for (const r of resolved) {
+      if (!r.finalUrl || !isPlayableFinalUrl(r.finalUrl) || seenUrls.has(r.finalUrl)) continue;
+      seenUrls.add(r.finalUrl);
+      const index = streams.length + 1;
+      const name = `Server${index} Eng`;
+      streams.push({
+        name,
+        server: name,
+        title: r.raw.title || "Original Audio",
+        url: r.finalUrl,
+        quality: qualityFromName(`${r.raw.name} ${r.raw.title}`),
+        type: /\.m3u8(?:\?|$)/i.test(r.finalUrl) || /\/hls\//i.test(r.finalUrl) ? "hls" : "mp4",
       });
+    }
 
     send(200, {
       success: streams.length > 0,

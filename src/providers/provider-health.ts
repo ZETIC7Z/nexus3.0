@@ -17,13 +17,22 @@ const healthCache = new Map<string, ProviderHealth>();
 function probeUrlFor(id: string): string | null {
   switch (id) {
     case "nexus-vidfast2":
-      // Probe the CF Worker's /vc-proxy endpoint — the worker forwards to
-      // vidfast.vc with proper headers from Cloudflare's own edge, so it
-      // works on all platforms (Vercel, local dev, any browser).
+      // Keep Zephyr's existing health check unchanged.
       return "https://vidfast.samxerz-zeticuz.workers.dev/vc-proxy?path=movie/603";
+    case "nexus-notorrent":
+      // Same-origin API route; verifies the direct addon integration is alive.
+      return "/api/notorrent?type=movie&id=tt1745960";
+    case "nexus-vidcore":
+    case "nexus-videasy":
+    case "nexus-vidup":
+    case "nexus-vidfast":
+      // These providers already return CORS-safe URLs from the TMDB-Embed
+      // backend. Probe each provider endpoint directly instead of probing a
+      // generic root or incorrectly marking it unhealthy.
+      return `https://stycanine1-tmdb-embed-api.hf.space/api/streams/${
+        id.replace("nexus-", "")
+      }/movie/533535`;
     case "nexus-embeds":
-      // Light liveness probe on the TMDB-Embed space root (~1s vs a 2-10s
-      // scrape). The space serves CORS `*`, so probe it directly.
       return "https://stycanine1-tmdb-embed-api.hf.space/";
     default:
       return null;
