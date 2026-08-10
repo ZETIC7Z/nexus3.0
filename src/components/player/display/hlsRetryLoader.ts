@@ -67,6 +67,28 @@ const MAX_RETRIES = 12;
 const BASE_DELAY = 250;
 const MAX_DELAY = 3000;
 
+// VidFast2 / Zephyr CDN hosts — these serve segments that require a
+// Referer of https://vidfast.vc/ and will 403 through the generic proxy.
+// Route them through the same-origin /api/vidfast2-stream/ts-proxy.
+const VIDFAST2_CDN_HOSTS = [
+  "brightmoss.top",
+  "moon.ironwallnet.net",
+  "housestrong.site",
+  "palesquare.top",
+];
+
+function isVidfast2CdnUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname;
+    return VIDFAST2_CDN_HOSTS.some(
+      (h) => host === h || host.endsWith(`.${h}`),
+    );
+  } catch {
+    return false;
+  }
+}
+
 // The TMDB-Embed backend rewrites every HLS segment to its own /ts-proxy and
 // serves CORS `*`, so those URLs are already playable straight — wrapping
 // them in the generic destination proxy breaks playback.
@@ -85,6 +107,14 @@ export class ArtemisRetryLoader extends DefaultLoader {
 
   load(context: any, config: any, callbacks: any): void {
     let url: string = context?.url ?? "";
+
+    // VidFast2 CDN segments: route through the same-origin stream proxy.
+    if (isVidfast2CdnUrl(url)) {
+      const params = new URLSearchParams({ url });
+      params.set("headers", JSON.stringify({ Referer: "https://vidfast.vc/", Origin: "https://vidfast.vc" }));
+      context.url = `/api/vidfast2-stream/ts-proxy?${params.toString()}`;
+      url = context.url;
+    }
 
     if (
       !isExtensionActiveCached() &&
