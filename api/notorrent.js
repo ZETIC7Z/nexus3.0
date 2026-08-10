@@ -127,6 +127,13 @@ function isPlayableFinalUrl(value) {
   return true;
 }
 
+function isHlsUrl(value) {
+  const lower = `${value ?? ""}`.toLowerCase();
+  // Some NoTorrent playlist proxies hide .m3u8 behind /stream-proxy/pl or
+  // an encoded `u=` query parameter, so extension-only detection is unsafe.
+  return /\.m3u8(?:\?|$)/i.test(lower) || /\/hls\//i.test(lower) || /stream-proxy\/pl/i.test(lower) || lower.includes("m3u8");
+}
+
 function qualityFromName(name) {
   const text = `${name ?? ""}`.toLowerCase();
   if (/(4k|2160|uhd)/.test(text)) return "4k";
@@ -238,7 +245,7 @@ export async function handleNotorrentRequest(req, res) {
         title: r.raw.title || "Original Audio",
         url: r.finalUrl,
         quality: qualityFromName(`${r.raw.name} ${r.raw.title}`),
-        type: /\.m3u8(?:\?|$)/i.test(r.finalUrl) || /\/hls\//i.test(r.finalUrl) ? "hls" : "mp4",
+        type: isHlsUrl(r.finalUrl) ? "hls" : "mp4",
       });
     }
 
