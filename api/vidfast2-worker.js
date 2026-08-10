@@ -2,7 +2,7 @@
 // Vercel serverless function — transparent proxy to the VidFast2 Cloudflare Worker.
 // Upstream: https://vidfast.samxerz-zeticuz.workers.dev
 
-const UPSTREAM = "https://vidfast.samxerz-zeticuz.workers.dev";
+const UPSTREAM = "https://vidfast.yogeshkumarjamre1.workers.dev";
 
 export default async function handler(req, res) {
   // Accept both query-param (?path=route-config) and path-style (/route-config).

@@ -7,6 +7,7 @@ import loadVersion from "vite-plugin-package-version";
 import { VitePWA } from "vite-plugin-pwa";
 import checker from "vite-plugin-checker";
 import { handlebars } from "./plugins/handlebars";
+import { notorrentApiPlugin } from "./plugins/notorrent-api";
 import { PluginOption, loadEnv, splitVendorChunkPlugin } from "vite";
 import { visualizer } from "rollup-plugin-visualizer";
 
@@ -131,6 +132,7 @@ export default defineConfig(({ mode }) => {
         },
       }),
       loadVersion(),
+      notorrentApiPlugin(),
       checker({
         overlay: {
           position: "tr",
@@ -207,7 +209,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // ── VidFast 2 — Cloudflare Worker (encryption toolkit) ──────────
         "/api/vidfast2-worker": {
-          target: "https://vidfast.samxerz-zeticuz.workers.dev",
+          target: "https://vidfast.yogeshkumarjamre1.workers.dev",
           changeOrigin: true,
           rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-worker/, ""),
         },

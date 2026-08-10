@@ -265,6 +265,156 @@ export async function rankStreams(
   });
 }
 
+/**
+ * Derive a label for a server entry.
+ * - NoTorrent: audio language from title ("Audio Latino" → "Español (Latino)")
+ * - VidCore/VidUp/Videasy/VidFast: server name ("Vidcore (Prime)" → "Prime")
+ * - Anime: sub/dub tag
+ * Falls back to quality or numbered slot.
+ */
+export function deriveServerLabel(
+  item: EmbedStreamItem,
+  index: number,
+  backend?: string,
+): string {
+  const title = (item.title || "").trim();
+  const server = (item.server || item.name || "").trim();
+  const quality = (item.quality || "").toLowerCase();
+
+  if (backend === "notorrent") {
+    return deriveNotorrentLabel(title, server, quality, index);
+  }
+
+  // Anime: sub/dub
+  const subDubMatch = (title + " " + server).match(/\((sub|dub|raw)\)/i);
+  if (subDubMatch) {
+    const tag = subDubMatch[1].toLowerCase();
+    if (tag === "dub") return "English (dub)";
+    if (tag === "sub") return "日本語 (sub)";
+    return "Raw";
+  }
+
+  // Other providers: extract server name from parentheses
+  return deriveProviderServerName(server, index);
+}
+
+function deriveNotorrentLabel(title: string, server: string, quality: string, index: number): string {
+  const lang = extractLanguage(title) || extractLanguage(server);
+  if (lang) return lang;
+  const qLabel = qualityToLabel(quality);
+  if (qLabel) return qLabel;
+  return `Audio ${index + 1}`;
+}
+
+function deriveProviderServerName(raw: string, index: number): string {
+  if (!raw) return `Server ${index + 1}`;
+  const noEmoji = raw
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const m = noEmoji.match(/\(([^)]+)\)/);
+  if (m) {
+    const inner = m[1].trim();
+    if (inner) return inner;
+  }
+  if (noEmoji) return noEmoji;
+  return `Server ${index + 1}`;
+}
+
+function qualityToLabel(q: string): string | null {
+  if (!q || q === "unknown") return null;
+  if (q === "4k" || q === "2160") return "4K";
+  if (q === "1080") return "1080p";
+  if (q === "720") return "720p";
+  if (q === "480") return "480p";
+  if (q === "360") return "360p";
+  return `${q}p`;
+}
+
+/** Supported language patterns → display label. */
+const LANG_PATTERNS: [RegExp, string][] = [
+  [/original\s*audio/i, "English"],
+  [/audio\s*latino/i, "Español (Latino)"],
+  [/audio\s*latina/i, "Español (Latino)"],
+  [/audio\s*spanish/i, "Español"],
+  [/audio\s*español/i, "Español"],
+  [/spanish\s*dub/i, "Español (dub)"],
+  [/audio\s*english/i, "English"],
+  [/audio\s*inglés/i, "English"],
+  [/english\s*dub/i, "English (dub)"],
+  [/türkçe/i, "Türkçe"],
+  [/turkish\s*dub/i, "Türkçe (dub)"],
+  [/audio\s*turkish/i, "Türkçe"],
+  [/audio\s*french/i, "Français"],
+  [/french\s*dub/i, "Français (dub)"],
+  [/audio\s*german/i, "Deutsch"],
+  [/german\s*dub/i, "Deutsch (dub)"],
+  [/audio\s*italian/i, "Italiano"],
+  [/italian\s*dub/i, "Italiano (dub)"],
+  [/audio\s*portuguese/i, "Português"],
+  [/portuguese\s*dub/i, "Português (dub)"],
+  [/audio\s*japanese/i, "日本語"],
+  [/japanese\s*dub/i, "日本語 (dub)"],
+  [/audio\s*korean/i, "한국어"],
+  [/korean\s*dub/i, "한국어 (dub)"],
+  [/audio\s*arabic/i, "العربية"],
+  [/audio\s*russian/i, "Русский"],
+  [/audio\s*hindi/i, "हिन्दी"],
+  [/audio\s*tamil/i, "தமிழ்"],
+  [/audio\s*telugu/i, "తెలుగు"],
+  [/audio\s*indonesian/i, "Bahasa Indonesia"],
+  [/audio\s*thai/i, "ไทย"],
+  [/audio\s*vietnamese/i, "Tiếng Việt"],
+  [/audio\s*polish/i, "Polski"],
+  [/audio\s*dutch/i, "Nederlands"],
+  [/audio\s*tagalog/i, "Tagalog"],
+  [/audio\s*bengali/i, "বাংলা"],
+  [/audio\s*ukrainian/i, "Українська"],
+  [/audio\s*chinese/i, "中文"],
+];
+
+function extractLanguage(text: string): string | null {
+  if (!text) return null;
+  const clean = text
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, "")
+    .replace(/\[FREE\]|\[FREE TRIAL\]/gi, "")
+    .replace(/\n.*$/m, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  for (const [pattern, label] of LANG_PATTERNS) {
+    if (pattern.test(clean)) return label;
+  }
+  return null;
+}
+
+export function languageCodeFromLabel(label: string): string {
+  const lower = label.toLowerCase();
+  if (lower.includes("english") || lower === "1080p" || lower === "720p" || lower === "480p" || lower === "4k") return "en";
+  if (lower.includes("latino") || lower.includes("español") || lower.includes("spanish")) return "es";
+  if (lower.includes("türkçe") || lower.includes("turkish")) return "tr";
+  if (lower.includes("français") || lower.includes("french")) return "fr";
+  if (lower.includes("deutsch") || lower.includes("german")) return "de";
+  if (lower.includes("italiano") || lower.includes("italian")) return "it";
+  if (lower.includes("português") || lower.includes("portuguese")) return "pt";
+  if (lower.includes("日本語") || lower.includes("japanese")) return "ja";
+  if (lower.includes("한국어") || lower.includes("korean")) return "ko";
+  if (lower.includes("العربية") || lower.includes("arabic")) return "ar";
+  if (lower.includes("русский") || lower.includes("russian")) return "ru";
+  if (lower.includes("हिन्दी") || lower.includes("hindi")) return "hi";
+  if (lower.includes("தமிழ்") || lower.includes("tamil")) return "ta";
+  if (lower.includes("తెలుగు") || lower.includes("telugu")) return "te";
+  if (lower.includes("indonesian") || lower.includes("bahasa")) return "id";
+  if (lower.includes("ไทย") || lower.includes("thai")) return "th";
+  if (lower.includes("việt") || lower.includes("vietnamese")) return "vi";
+  if (lower.includes("polski") || lower.includes("polish")) return "pl";
+  if (lower.includes("nederlands") || lower.includes("dutch")) return "nl";
+  if (lower.includes("tagalog")) return "tl";
+  if (lower.includes("বাংলা") || lower.includes("bengali")) return "bn";
+  if (lower.includes("українська") || lower.includes("ukrainian")) return "uk";
+  if (lower.includes("中文") || lower.includes("chinese")) return "zh";
+  return "und";
+}
+
 export function pickUsable(ranked: RankedStream[]): RankedStream[] {
   // STRICT: only return servers that actually responded to the probe. The
   // movie-web runner stops at the first embed that returns a stream, so a
@@ -563,6 +713,34 @@ export function makeEmbedProvider(opts: {
  * Create a standalone source provider from an embed backend.
  * Each provider becomes its own source in the player's source list.
  */
+// ── NoTorrent Stremio addon integration ────────────────────────────────────
+async function scrapeNotorrentItems(ctx: any): Promise<EmbedStreamItem[]> {
+  const media = ctx.media;
+  const id = media?.imdbId;
+  if (!id) return [];
+  const type = media.type === "movie" ? "movie" : "series";
+  const params = new URLSearchParams({ type, id });
+  if (media.type === "show" && media.season && media.episode) {
+    params.set("season", String(media.season.number));
+    params.set("episode", String(media.episode.number));
+  }
+  const res = await fetch(`/api/notorrent?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(EMBED_REQUEST_TIMEOUT),
+  });
+  if (!res.ok) return [];
+  const json: EmbedApiResponse = await res.json();
+  if (!json?.success) return [];
+  return (json.streams ?? []).map((s: any) => ({
+    name: s.name,
+    server: s.server || s.name,
+    title: s.title,
+    url: s.url,
+    quality: s.quality || "unknown",
+    type: s.type,
+  }));
+}
+
 export function makeStandaloneSource(opts: {
   id: string;
   name: string;
@@ -577,9 +755,19 @@ export function makeStandaloneSource(opts: {
     rank,
     async scrape(ctx: any) {
       try {
-        const apiUrl = buildEmbedUrl(backend, ctx);
-        const data = await fetchEmbedApi(apiUrl);
-        const items = data.streams ?? [];
+        let items: EmbedStreamItem[] = [];
+        if (backend === "notorrent") {
+          items = await scrapeNotorrentItems(ctx);
+          if (items.length === 0) {
+            const apiUrl = buildEmbedUrl(backend, ctx);
+            const data = await fetchEmbedApi(apiUrl);
+            items = data.streams ?? [];
+          }
+        } else {
+          const apiUrl = buildEmbedUrl(backend, ctx);
+          const data = await fetchEmbedApi(apiUrl);
+          items = data.streams ?? [];
+        }
         if (items.length === 0) throw new NotFoundError(`${name}: no sources`);
 
         const ranked = await rankStreams(items);
@@ -594,16 +782,13 @@ export function makeStandaloneSource(opts: {
         const mainPool = subs.length > 0 ? subs : usable;
 
         if (anime && dubs.length > 0) {
-          // Return best sub as stream, dubs as audio tracks
           const best = mainPool[0];
           const captions = extractCaptions(best.item, `${id}-sub`);
           const stream = isHlsItem(best.item)
             ? buildHlsStream(best.item.url, `${id}-hls`, captions)
             : buildFileStream({ [best.quality]: { type: "mp4", url: best.item.url } }, `${id}-file`, captions);
-
-          // Anime: default is Japanese (sub), dubs are alternatives with flags
           const audioTracks: any[] = [
-            { id: `${id}-audio-jp`, label: `🇯🇵 Japanese`, language: "ja", url: best.item.url, default: true },
+            { id: `${id}-audio-jp`, label: "🇯🇵 Japanese", language: "ja", url: best.item.url, default: true },
           ];
           const seen = new Set<string>(["und"]);
           for (const r of dubs) {
@@ -617,9 +802,40 @@ export function makeStandaloneSource(opts: {
           return { embeds: [], stream: [stream] };
         }
 
-        // Return all working servers as numbered embeds so user can pick.
-        // Pack captions + audio info alongside the URL so the server embed
-        // can build a complete stream with subtitles.
+        // For NoTorrent: return each language as its own embed so user can pick.
+        // Non-English streams become additional audio tracks on the English embed.
+        // For other providers: return servers as embeds with real server names.
+        const labels = mainPool.map((r, i) => deriveServerLabel(r.item, i, backend));
+        setServerEmbedLabels(labels);
+
+        if (backend === "notorrent") {
+          // Split: English first, then other languages as embeds with audio info.
+          const engIdx = labels.findIndex((l: string) =>
+            l.toLowerCase().includes("english") || l === "1080p" || l === "720p"
+          );
+          const ordered = engIdx >= 0
+            ? [mainPool[engIdx], ...mainPool.filter((_, i) => i !== engIdx)]
+            : mainPool;
+          const orderedLabels = engIdx >= 0
+            ? [labels[engIdx], ...labels.filter((_, i) => i !== engIdx)]
+            : labels;
+
+          return {
+            embeds: ordered.map((r, i) => ({
+              embedId: `nexus-server-${i + 1}`,
+              url: JSON.stringify({
+                url: r.item.url,
+                captions: extractCaptions(r.item, `${id}-srv${i + 1}`),
+                quality: r.quality,
+                label: orderedLabels[i],
+                language: languageCodeFromLabel(orderedLabels[i]),
+              }),
+            })),
+            stream: [],
+          };
+        }
+
+        // Non-NoTorrent providers: real server names
         return {
           embeds: mainPool.map((r, i) => ({
             embedId: `nexus-server-${i + 1}`,
@@ -627,7 +843,7 @@ export function makeStandaloneSource(opts: {
               url: r.item.url,
               captions: extractCaptions(r.item, `${id}-srv${i + 1}`),
               quality: r.quality,
-              label: r.item.server || r.item.title || `Server ${i + 1}`,
+              label: labels[i],
             }),
           })),
           stream: [],
