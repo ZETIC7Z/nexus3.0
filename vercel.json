@@ -4,23 +4,23 @@
   "installCommand": "pnpm install",
   "rewrites": [
     {
-      "source": "/api/vidfast2-vc/(.*)",
+      "source": "/api/vidfast2-vc/([^?]*)",
       "destination": "/api/vidfast2-vc?path=$1"
     },
     {
-      "source": "/api/vidfast2-worker/(.*)",
+      "source": "/api/vidfast2-worker/([^?]*)",
       "destination": "/api/vidfast2-worker?path=$1"
     },
     {
-      "source": "/api/vidfast2-stream/(.*)",
+      "source": "/api/vidfast2-stream/([^?]*)",
       "destination": "/api/vidfast2-stream?path=$1"
     },
     {
-      "source": "/api/tmdb/(.*)",
+      "source": "/api/tmdb/([^?]*)",
       "destination": "/api/tmdb?path=$1"
     },
     {
-      "source": "/api/moviebox/(.*)",
+      "source": "/api/moviebox/([^?]*)",
       "destination": "/api/moviebox?path=$1"
     },
     {
