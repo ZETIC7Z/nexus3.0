@@ -119,7 +119,12 @@ function rewritePlaylist(text, baseUrl, queryHeaders) {
 }
 
 export default async function handler(req, res) {
-  const path = (req.query?.path || "").replace(/^\/+|\/+$/g, "");
+  // Accept both path-style (/m3u8-proxy?url=...) and query-param (?path=m3u8-proxy&url=...).
+  let rawPath = req.query?.path || "";
+  if (!rawPath) {
+    rawPath = (req.url || "").replace(/^.*?\/api\/vidfast2-stream\/?/, "").replace(/\?.*$/, "");
+  }
+  const path = rawPath.replace(/^\/+|\/+$/g, "");
   if (!ALLOWED_PATHS.has(path)) {
     res.status(404).send("Not found");
     return;
