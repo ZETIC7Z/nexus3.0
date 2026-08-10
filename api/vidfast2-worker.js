@@ -1,37 +1,48 @@
 // api/vidfast2-worker.js
 // Vercel serverless function — transparent proxy to the VidFast2 Cloudflare Worker.
 // Upstream: https://vidfast.samxerz-zeticuz.workers.dev (has /vc-proxy endpoint)
+//
+// Vercel rewrites /api/vidfast2-worker/{endpoint}?{params} to
+// /api/vidfast2-worker?wp={endpoint}&{params}. This function extracts
+// the worker endpoint from `wp` and forwards all other query params.
 
 const UPSTREAM = "https://vidfast.samxerz-zeticuz.workers.dev";
 
 export default async function handler(req, res) {
-  // Extract the worker endpoint from the URL pathname.
-  // /api/vidfast2-worker/route-config  →  route-config
-  // /api/vidfast2-worker/vc-proxy      →  vc-proxy
-  const fullUrl = req.url || "";
-  const qIndex = fullUrl.indexOf("?");
-  const pathname = qIndex >= 0 ? fullUrl.slice(0, qIndex) : fullUrl;
-  const rawQuery = qIndex >= 0 ? fullUrl.slice(qIndex + 1) : "";
+  // Get the worker endpoint from the rewrite-added `wp` param, or from the
+  // raw URL pathname for direct requests (no rewrite, dev mode).
+  let rawPath = "";
 
-  let rawPath = pathname
-    .replace(/^.*?\/api\/vidfast2-worker\/?/, "")
-    .replace(/^\/+|\/+$/g, "");
+  // From rewrite: /api/vidfast2-worker?wp=route-config
+  const wp = req.query?.wp;
+  if (wp) {
+    rawPath = Array.isArray(wp) ? wp[0] : wp;
+  }
 
-  // Fallback: legacy ?path= style from old Vercel rewrite (no longer used)
+  // From path-style URL (dev mode, no rewrite):
+  // /api/vidfast2-worker/route-config
+  if (!rawPath) {
+    const fullUrl = req.url || "";
+    const qIndex = fullUrl.indexOf("?");
+    const pathname = qIndex >= 0 ? fullUrl.slice(0, qIndex) : fullUrl;
+    rawPath = pathname
+      .replace(/^.*?\/api\/vidfast2-worker\/?/, "")
+      .replace(/^\/+|\/+$/g, "");
+  }
+
+  // Legacy ?path= style
   if (!rawPath && req.query?.path) {
     rawPath = Array.isArray(req.query.path) ? req.query.path[0] : req.query.path;
   }
 
   if (!rawPath) { res.status(400).send("Missing path"); return; }
 
-  // Parse query params manually from the URL. Vercel's req.query may not
-  // be populated for path-style URLs, and we need to forward params as-is.
+  // Forward ALL query params EXCEPT the rewrite-added `wp` to the worker
   const upstreamUrl = new URL(`${UPSTREAM}/${rawPath}`);
-  if (rawQuery) {
-    // Parse incoming query string and forward all params to the worker
-    const qp = new URLSearchParams(rawQuery);
-    for (const [k, v] of qp) {
-      upstreamUrl.searchParams.append(k, v);
+  for (const [k, v] of Object.entries(req.query || {})) {
+    if (k === "wp") continue; // skip rewrite param
+    for (const item of Array.isArray(v) ? v : [v]) {
+      upstreamUrl.searchParams.append(k, item);
     }
   }
 
