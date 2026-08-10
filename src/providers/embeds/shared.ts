@@ -300,27 +300,111 @@ export async function rankStreams(
 }
 
 /**
- * Derive a short human-readable server name from an API item, stripping the
- * provider prefix so "Vidcore (Prime)" → "Prime", "VidUp (Euro)" → "Euro",
- * "AniKoto - Vidstream-2 (sub)" → "Vidstream-2 (sub)". Falls back to the raw
- * name when there is nothing to strip.
+ * Extract an audio-language label from an embed item. Prefers the title
+ * (which carries language info like "Audio Latino" or "Original Audio"),
+ * then falls back to the server/name. Returns quality + index as last resort.
  */
 export function deriveServerLabel(
   item: EmbedStreamItem,
   index: number,
 ): string {
-  const raw = (item.server || item.title || item.name || "").trim();
-  if (!raw) return `Server ${index + 1}`;
-  // Strip leading emoji / flags (e.g. "🌐 1080p - MPV Player").
-  const noEmoji = raw
-    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, "")
+  const title = (item.title || "").trim();
+  const server = (item.server || item.name || "").trim();
+  const quality = (item.quality || "").toLowerCase();
+
+  // ── Extract language from title ──────────────────────────────────────
+  const lang = extractLanguage(title);
+  if (lang) return lang;
+
+  // ── Extract language from server/name ────────────────────────────────
+  const serverLang = extractLanguage(server);
+  if (serverLang) return serverLang;
+
+  // ── Anime sub/dub pattern ────────────────────────────────────────────
+  const subDubMatch = (title + " " + server).match(/\((sub|dub|raw)\)/i);
+  if (subDubMatch) {
+    const tag = subDubMatch[1].toLowerCase();
+    if (tag === "dub") return "English (dub)";
+    if (tag === "sub") return "日本語 (sub)";
+    return "Raw";
+  }
+
+  // ── Quality fallback ─────────────────────────────────────────────────
+  const qLabel = qualityToLabel(quality);
+  if (qLabel) return qLabel;
+
+  return `Audio ${index + 1}`;
+}
+
+/** Known language keywords → display label (sorted long-first). */
+const LANG_PATTERNS: [RegExp, string][] = [
+  [/original\s*audio/i, "English"],
+  [/audio\s*latino/i, "Español (Latino)"],
+  [/audio\s*latina/i, "Español (Latino)"],
+  [/audio\s*spanish/i, "Español"],
+  [/audio\s*español/i, "Español"],
+  [/spanish\s*dub/i, "Español (dub)"],
+  [/audio\s*english/i, "English"],
+  [/audio\s*inglés/i, "English"],
+  [/english\s*dub/i, "English (dub)"],
+  [/türkçe/i, "Türkçe"],
+  [/turkish\s*dub/i, "Türkçe (dub)"],
+  [/audio\s*turkish/i, "Türkçe"],
+  [/audio\s*french/i, "Français"],
+  [/french\s*dub/i, "Français (dub)"],
+  [/audio\s*german/i, "Deutsch"],
+  [/german\s*dub/i, "Deutsch (dub)"],
+  [/audio\s*italian/i, "Italiano"],
+  [/italian\s*dub/i, "Italiano (dub)"],
+  [/audio\s*portuguese/i, "Português"],
+  [/portuguese\s*dub/i, "Português (dub)"],
+  [/audio\s*japanese/i, "日本語"],
+  [/japanese\s*dub/i, "日本語 (dub)"],
+  [/audio\s*korean/i, "한국어"],
+  [/korean\s*dub/i, "한국어 (dub)"],
+  [/audio\s*arabic/i, "العربية"],
+  [/audio\s*russian/i, "Русский"],
+  [/audio\s*hindi/i, "हिन्दी"],
+  [/audio\s*tamil/i, "தமிழ்"],
+  [/audio\s*telugu/i, "తెలుగు"],
+  [/audio\s*indonesian/i, "Bahasa Indonesia"],
+  [/audio\s*thai/i, "ไทย"],
+  [/audio\s*vietnamese/i, "Tiếng Việt"],
+  [/audio\s*polish/i, "Polski"],
+  [/audio\s*dutch/i, "Nederlands"],
+  [/audio\s*tagalog/i, "Tagalog"],
+  [/audio\s*bengali/i, "বাংলা"],
+  [/audio\s*ukrainian/i, "Українська"],
+  [/audio\s*chinese/i, "中文"],
+];
+
+function stripFlagsAndEmoji(s: string): string {
+  // eslint-disable-next-line no-misleading-character-class
+  return s.replace(/[\u{1F1E0}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}\u{200B}-\u{200F}\u{2028}-\u{202F}\u{205F}-\u{206F}]/gu, "");
+}
+
+function extractLanguage(text: string): string | null {
+  if (!text) return null;
+  // Strip emoji, trailing tags, and newlines for cleaner matching.
+  const clean = stripFlagsAndEmoji(text)
+    .replace(/\[FREE\]|\[FREE TRIAL\]/gi, "")
+    .replace(/\n.*$/m, "")
     .replace(/\s+/g, " ")
     .trim();
-  // Remove the leading provider-name segment before the first "(" or " - ".
-  const stripped = noEmoji.replace(/^[^()]*?[(-]\s*/u, "").trim();
-  const clean = stripped.replace(/[()]/g, "").trim();
-  if (!clean) return noEmoji || raw;
-  return clean;
+  for (const [pattern, label] of LANG_PATTERNS) {
+    if (pattern.test(clean)) return label;
+  }
+  return null;
+}
+
+function qualityToLabel(q: string): string | null {
+  if (!q || q === "unknown") return null;
+  if (q === "4k" || q === "2160") return "4K";
+  if (q === "1080") return "1080p";
+  if (q === "720") return "720p";
+  if (q === "480") return "480p";
+  if (q === "360") return "360p";
+  return `${q}p`;
 }
 
 export function pickUsable(ranked: RankedStream[]): RankedStream[] {
