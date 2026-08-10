@@ -105,6 +105,14 @@ const VIDFAST2_CDN_HOSTS = [
   "housestrong.site",
   "palesquare.top",
   "polarcandy.top",
+  "palehive.top",
+  "paledune.top",
+  "palestone.top",
+  "polarlake.top",
+  "brightleaf.top",
+  "brightstone.top",
+  "moonshard.top",
+  "moondust.top",
 ];
 
 function isVidfast2CdnUrl(url: string): boolean {

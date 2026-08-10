@@ -20,7 +20,7 @@ function probeUrlFor(id: string): string | null {
       // Probe the CF Worker's /vc-proxy endpoint — the worker forwards to
       // vidfast.vc with proper headers from Cloudflare's own edge, so it
       // works on all platforms (Vercel, local dev, any browser).
-      return "https://vidfast.samxerz12.workers.dev/vc-proxy?path=movie/603";
+      return "https://vidfast.samxerz-zeticuz.workers.dev/vc-proxy?path=movie/603";
     case "nexus-embeds":
       // Light liveness probe on the TMDB-Embed space root (~1s vs a 2-10s
       // scrape). The space serves CORS `*`, so probe it directly.

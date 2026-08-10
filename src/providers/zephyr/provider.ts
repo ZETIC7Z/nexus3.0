@@ -2,6 +2,7 @@
 // NEXUS — Zephyr (VidFast 2) provider (Cloudflare Worker encryption toolkit)
 // ---------------------------------------------------------------------------
 // Worker URL:   https://vidfast.samxerz-zeticuz.workers.dev
+//              (deployed with /vc-proxy endpoint for vidfast.vc relay)
 //
 // The CF Worker handles the crypto (/generate, /decrypt, /route-config).
 // All raw vidfast.vc page/API calls route through the app's SAME-ORIGIN
@@ -25,12 +26,13 @@ import { flags, labelToLanguageCode } from "@nexus/providers";
 import { makeProviderContext } from "../shared/makeProviderContext";
 import { ScrapeContext } from "../shared/types";
 
-// CF Worker crypto endpoint — reached through the SAME-ORIGIN proxy
-// (/api/vidfast2-worker). The updated worker's responses carry no CORS
-// headers, so a direct browser fetch to workers.dev is blocked. The Vite
-// dev proxy and the api/vidfast2-worker.js Vercel function forward to the
-// worker server-side, which sidesteps CORS entirely.
+// CF Worker URL — also acts as VC proxy (Cloudflare-to-Cloudflare, avoids
+// WAF IP blocks that Vercel's datacenter IPs hit). The worker's responses
+// carry no CORS headers, so a direct browser fetch to workers.dev is
+// blocked. The Vite dev proxy and the api/vidfast2-worker.js Vercel
+// function forward to the worker server-side, which sidesteps CORS entirely.
 const WORKER_BASE = "/api/vidfast2-worker";
+const WORKER_VC_PROXY = `${WORKER_BASE}/vc-proxy`;
 
 // Stream proxy — same-origin route (Vite dev proxy or Vercel function)
 const STREAM_PROXY = "/api/vidfast2-stream";
@@ -38,13 +40,13 @@ const STREAM_PROXY = "/api/vidfast2-stream";
 // Real domain used only for Referer/Origin headers on stream CDN access
 const VIDFAST_REFERER = "https://vidfast.vc";
 
-// ── VC via same-origin proxy ────────────────────────────────────────────
-// All raw vidfast.vc calls go through /api/vidfast2-vc — the Vite dev proxy
-// or the Vercel serverless function. Both inject the browser headers the
-// WAF expects and forward the X-CSRF-Token. Same-origin means the browser
-// never hits CORS and the Referer/User-Agent can be set server-side.
+// ── VC via worker proxy ─────────────────────────────────────────────────
+// All raw vidfast.vc calls go through the CF Worker's /vc-proxy endpoint.
+// The worker runs on Cloudflare's edge, so vidfast.vc's Cloudflare WAF
+// sees a Cloudflare IP (not Vercel's datacenter IP) and doesn't block it.
+// Browser → same-origin /api/vidfast2-worker/vc-proxy → CF Worker → vidfast.vc
 function vcUrl(path: string): string {
-  return `/api/vidfast2-vc/${path.replace(/^\/+/, "")}`;
+  return `${WORKER_VC_PROXY}?path=${encodeURIComponent(path)}`;
 }
 
 /** Worker endpoint URL (same-origin). */
@@ -122,7 +124,7 @@ async function req(
   const csrf =
     (route?.headers as Record<string, string> | undefined)?.["X-CSRF-Token"] ??
     (route?.headers as Record<string, string> | undefined)?.["x-csrf-token"];
-  if (csrf && url.startsWith("/api/vidfast2-vc")) {
+  if (csrf && (url.startsWith(WORKER_VC_PROXY) || url.startsWith("/api/vidfast2-vc"))) {
     init = {
       ...init,
       headers: { ...(init.headers ?? {}), "X-CSRF-Token": csrf },
