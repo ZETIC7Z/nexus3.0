@@ -32,7 +32,6 @@ import { ScrapeContext } from "../shared/types";
 // blocked. The Vite dev proxy and the api/vidfast2-worker.js Vercel
 // function forward to the worker server-side, which sidesteps CORS entirely.
 const WORKER_BASE = "/api/vidfast2-worker";
-const WORKER_VC_PROXY = `${WORKER_BASE}/vc-proxy`;
 
 // Stream proxy — same-origin route (Vite dev proxy or Vercel function)
 const STREAM_PROXY = "/api/vidfast2-stream";
@@ -44,14 +43,14 @@ const VIDFAST_REFERER = "https://vidfast.vc";
 // All raw vidfast.vc calls go through the CF Worker's /vc-proxy endpoint.
 // The worker runs on Cloudflare's edge, so vidfast.vc's Cloudflare WAF
 // sees a Cloudflare IP (not Vercel's datacenter IP) and doesn't block it.
-// Browser → same-origin /api/vidfast2-worker/vc-proxy → CF Worker → vidfast.vc
+// Uses ?wp= query-param style (works on both Vite dev proxy and Vercel).
 function vcUrl(path: string): string {
-  return `${WORKER_VC_PROXY}?path=${encodeURIComponent(path)}`;
+  return `${WORKER_BASE}?wp=vc-proxy&path=${encodeURIComponent(path)}`;
 }
 
-/** Worker endpoint URL (same-origin). */
-function workerUrl(path: string): string {
-  return `${WORKER_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+/** Worker endpoint URL (same-origin, query-param style for Vercel compat). */
+function workerUrl(ep: string): string {
+  return `${WORKER_BASE}?wp=${ep}`;
 }
 
 function makeStreamProxyUrl(url: string, kind: "m3u8-proxy" | "ts-proxy"): string {
@@ -124,7 +123,7 @@ async function req(
   const csrf =
     (route?.headers as Record<string, string> | undefined)?.["X-CSRF-Token"] ??
     (route?.headers as Record<string, string> | undefined)?.["x-csrf-token"];
-  if (csrf && (url.startsWith(WORKER_VC_PROXY) || url.startsWith("/api/vidfast2-vc"))) {
+  if (csrf && (url.startsWith(WORKER_BASE) || url.startsWith("/api/vidfast2-vc"))) {
     init = {
       ...init,
       headers: { ...(init.headers ?? {}), "X-CSRF-Token": csrf },

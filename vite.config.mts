@@ -211,7 +211,18 @@ export default defineConfig(({ mode }) => {
         "/api/vidfast2-worker": {
           target: "https://vidfast.samxerz-zeticuz.workers.dev",
           changeOrigin: true,
-          rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-worker/, ""),
+          rewrite: (requestPath: string) => {
+            const withoutBase = requestPath.replace(/^\/api\/vidfast2-worker/, "");
+            // Query-param style: /api/vidfast2-worker?wp=route-config&path=...
+            // Convert to path-style for the worker: /route-config?path=...
+            const wpMatch = withoutBase.match(/^\?wp=([^&]+)(.*)/);
+            if (wpMatch) {
+              const ep = decodeURIComponent(wpMatch[1]);
+              const rest = wpMatch[2]; // "&path=..." or ""
+              return "/" + ep + (rest ? rest.replace(/^&/, "?") : "");
+            }
+            return withoutBase;
+          },
         },
         // ── VidFast 2 — vidfast.vc direct API calls ─────────────────────
         "/api/vidfast2-vc": {
