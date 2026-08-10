@@ -1,6 +1,11 @@
 // api/vidfast2-vc.js
 // Vercel serverless function — transparent proxy to vidfast.vc with browser headers.
 // Upstream: https://vidfast.vc
+//
+// The Zephyr provider routes ALL raw vidfast.vc calls through this endpoint
+// (replacing the old CF Worker /vc-proxy route, which the updated worker no
+// longer exposes). The Vite dev server proxies /api/vidfast2-vc with the same
+// headers, so this path works identically locally and in production.
 
 const UPSTREAM = "https://vidfast.vc";
 
@@ -39,6 +44,12 @@ export default async function handler(req, res) {
   const reqCt = req.headers && req.headers["content-type"];
   if (reqCt) {
     headers["Content-Type"] = Array.isArray(reqCt) ? reqCt[0] : reqCt;
+  }
+  // vidfast.vc's API requires the X-CSRF-Token returned by /route-config.
+  // Forward whatever the client sends (the Zephyr provider attaches it).
+  const csrf = req.headers && req.headers["x-csrf-token"];
+  if (csrf) {
+    headers["X-CSRF-Token"] = Array.isArray(csrf) ? csrf[0] : csrf;
   }
 
   try {

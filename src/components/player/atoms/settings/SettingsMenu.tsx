@@ -14,6 +14,7 @@ import { usePlayerStore } from "@/stores/player/store";
 import { qualityToString } from "@/stores/player/utils/qualities";
 import { useSubtitleStore } from "@/stores/subtitles";
 import { getPrettyLanguageNameFromLocale } from "@/utils/locale/language";
+import { getServerEmbedLabel } from "@/providers/embeds/shared";
 
 export function SettingsMenu({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -37,6 +38,9 @@ export function SettingsMenu({ id }: { id: string }) {
   }, [currentSourceId]);
   const embedName = useMemo(() => {
     if (!currentEmbedId) return undefined;
+    // Prefer the real server name (Prime / Orbit / Euro) over generic "Server N".
+    const serverLabel = getServerEmbedLabel(currentEmbedId);
+    if (serverLabel) return serverLabel;
     const meta = getCachedMetadata().find((s) => s.id === currentEmbedId);
     return meta?.name;
   }, [currentEmbedId]);

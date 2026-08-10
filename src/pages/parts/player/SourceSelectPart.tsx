@@ -11,6 +11,7 @@ import {
 import { Menu } from "@/components/player/internals/ContextMenu";
 import { SelectableLink } from "@/components/player/internals/ContextMenu/Links";
 import { getLiveNexusProviders } from "@/providers/nexus-providers-index";
+import { getPackedEmbedLabel } from "@/providers/embeds/shared";
 import { usePreferencesStore } from "@/stores/preferences";
 import { usePlayerStore } from "@/stores/player/store";
 import { isAnimeByTitle, getAllowedSourceIds } from "@/providers/allowed-providers";
@@ -31,9 +32,12 @@ function EmbedOption(props: {
 
   const embedName = useMemo(() => {
     if (!props.embedId) return unknownEmbedName;
+    // Prefer the real server name packed by the source (Prime / Orbit / Euro).
+    const packedLabel = getPackedEmbedLabel(props.url);
+    if (packedLabel) return packedLabel;
     const meta = getCachedMetadata().find((s) => s.id === props.embedId);
     return meta?.name ?? unknownEmbedName;
-  }, [props.embedId, unknownEmbedName]);
+  }, [props.embedId, props.url, unknownEmbedName]);
 
   const { run, errored, loading, notFound } = useEmbedScraping(
     props.routerId,

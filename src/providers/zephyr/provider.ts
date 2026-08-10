@@ -3,18 +3,21 @@
 // ---------------------------------------------------------------------------
 // Worker URL:   https://vidfast.samxerz-zeticuz.workers.dev
 //
-// All VC (vidfast.vc) calls route through the CF Worker's /vc-proxy endpoint.
-// The worker runs on Cloudflare's edge, so vidfast.vc's Cloudflare WAF won't
-// block it. This works identically on local dev, Vercel, and any browser.
+// The CF Worker handles the crypto (/generate, /decrypt, /route-config).
+// All raw vidfast.vc page/API calls route through the app's SAME-ORIGIN
+// proxy (/api/vidfast2-vc) — the Vite dev proxy in development and the
+// api/vidfast2-vc.js serverless function on Vercel. That proxy injects the
+// browser headers vidfast.vc requires (Referer, User-Agent, X-Requested-With)
+// and forwards the X-CSRF-Token from route-config.
 //
 // Flow:
-//   1. GET  worker/vc-proxy?path=/{movie|tv}/{tmdbId}  → extract site token
-//   2. GET  worker/route-config                          → paths + headers
-//   3. POST worker/generate                              → encrypted payload
-//   4. POST worker/vc-proxy?path={sp}/{sp}/{payload}    → encrypted servers
-//   5. POST worker/decrypt                                → server list
-//   6. POST worker/vc-proxy?path={sp}/{stp}/{data}      → encrypted stream
-//   7. POST worker/decrypt                                → {url, tmdbId, tracks}
+//   1. GET  /api/vidfast2-vc/{movie|tv}/{tmdbId}      → extract site token
+//   2. GET  worker/route-config                        → paths + headers
+//   3. POST worker/generate                            → encrypted payload
+//   4. POST /api/vidfast2-vc/{sp}/{svp}/{payload}     → encrypted servers
+//   5. POST worker/decrypt                              → server list
+//   6. POST /api/vidfast2-vc/{sp}/{stp}/{data}        → encrypted stream
+//   7. POST worker/decrypt                              → {url, tmdbId, tracks}
 //   8. Return NEXUS stream object
 // ---------------------------------------------------------------------------
 
@@ -22,8 +25,12 @@ import { flags, labelToLanguageCode } from "@nexus/providers";
 import { makeProviderContext } from "../shared/makeProviderContext";
 import { ScrapeContext } from "../shared/types";
 
-// CF Worker — handles /generate, /decrypt, /route-config, and /vc-proxy
-const WORKER_BASE = "https://vidfast.samxerz-zeticuz.workers.dev";
+// CF Worker crypto endpoint — reached through the SAME-ORIGIN proxy
+// (/api/vidfast2-worker). The updated worker's responses carry no CORS
+// headers, so a direct browser fetch to workers.dev is blocked. The Vite
+// dev proxy and the api/vidfast2-worker.js Vercel function forward to the
+// worker server-side, which sidesteps CORS entirely.
+const WORKER_BASE = "/api/vidfast2-worker";
 
 // Stream proxy — same-origin route (Vite dev proxy or Vercel function)
 const STREAM_PROXY = "/api/vidfast2-stream";
@@ -31,13 +38,18 @@ const STREAM_PROXY = "/api/vidfast2-stream";
 // Real domain used only for Referer/Origin headers on stream CDN access
 const VIDFAST_REFERER = "https://vidfast.vc";
 
-// ── VC proxy via CF Worker ──────────────────────────────────────────────
-// All VC calls go through the CF Worker's /vc-proxy endpoint which adds
-// the required Referer, User-Agent, and X-Requested-With headers and
-// forwards to vidfast.vc. Cloudflare Workers run on Cloudflare's own edge,
-// so vidfast.vc's Cloudflare WAF never blocks these requests.
+// ── VC via same-origin proxy ────────────────────────────────────────────
+// All raw vidfast.vc calls go through /api/vidfast2-vc — the Vite dev proxy
+// or the Vercel serverless function. Both inject the browser headers the
+// WAF expects and forward the X-CSRF-Token. Same-origin means the browser
+// never hits CORS and the Referer/User-Agent can be set server-side.
 function vcUrl(path: string): string {
-  return `${WORKER_BASE}/vc-proxy?path=${encodeURIComponent(path)}`;
+  return `/api/vidfast2-vc/${path.replace(/^\/+/, "")}`;
+}
+
+/** Worker endpoint URL (same-origin). */
+function workerUrl(path: string): string {
+  return `${WORKER_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 function makeStreamProxyUrl(url: string, kind: "m3u8-proxy" | "ts-proxy"): string {
@@ -70,9 +82,14 @@ let _cached: RouteConfigResponse | null = null;
 let _cachedAt = 0;
 const RC_TTL = 30 * 60_000;
 
+/** Synchronous access to the cached route config (may be null before fetch). */
+function getRouteConfigSync(): RouteConfigResponse | null {
+  return _cached && Date.now() - _cachedAt < RC_TTL ? _cached : null;
+}
+
 async function getRouteConfig(): Promise<RouteConfigResponse> {
   if (_cached && Date.now() - _cachedAt < RC_TTL) return _cached;
-  const r = await fetch(`${WORKER_BASE}/route-config`);
+  const r = await fetch(workerUrl("route-config"));
   if (!r.ok) throw new Error(`VidFast2: route-config HTTP ${r.status}`);
   const j = await r.json();
   if (!j.success) throw new Error(`VidFast2: route-config: ${j.error}`);
@@ -98,6 +115,19 @@ async function req(
   timeoutMs = 15000,
   retries = 0,
 ): Promise<Response> {
+  // X-CSRF-Token is required by vidfast.vc's API endpoints. The route-config
+  // endpoint returns the current token; attach it to every VC call. The
+  // proxy (Vite dev + Vercel) forwards it upstream.
+  const route = getRouteConfigSync();
+  const csrf =
+    (route?.headers as Record<string, string> | undefined)?.["X-CSRF-Token"] ??
+    (route?.headers as Record<string, string> | undefined)?.["x-csrf-token"];
+  if (csrf && url.startsWith("/api/vidfast2-vc")) {
+    init = {
+      ...init,
+      headers: { ...(init.headers ?? {}), "X-CSRF-Token": csrf },
+    };
+  }
   for (let attempt = 0; ; attempt += 1) {
     const ctrl = new AbortController();
     const id = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -135,14 +165,13 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const { media } = ctx;
   const tmdbId = media.tmdbId;
 
-  // 1. Fetch vidfast.vc page via CF Worker proxy to extract site token
+  // 1. Fetch vidfast.vc page via same-origin proxy to extract site token
   let pagePath: string;
   if (media.type === "show" && media.season && media.episode) {
     pagePath = `/tv/${tmdbId}/${media.season.number}/${media.episode.number}`;
   } else {
     pagePath = `/movie/${tmdbId}`;
   }
-  // VC call routed through CF Worker /vc-proxy — works everywhere
   const pageRes = await req(vcUrl(pagePath), {}, 15000, 2);
   if (!pageRes.ok) throw new Error(`VidFast2: page HTTP ${pageRes.status}`);
   const html = await pageRes.text();
@@ -158,14 +187,14 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const { staticPath, serverPath, streamPath } = cfg.data;
 
   // 3. Generate payload
-  const gen = await (await req(`${WORKER_BASE}/generate`, {
+  const gen = await (await req(workerUrl("generate"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ siteData: rawData }),
   }, 20000)).json();
   if (!gen.success) throw new Error(`VidFast2: /generate: ${gen.error}`);
   const payload = gen.payload;
 
-  // 4. Get encrypted servers from vidfast.vc via CF Worker /vc-proxy
+  // 4. Get encrypted servers from vidfast.vc via same-origin proxy
   const serversRes = await req(vcUrl(`/${staticPath}/${serverPath}/${payload}`), {
     method: "POST",
   });
@@ -173,7 +202,7 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const encServers = await serversRes.text();
 
   // 5. Decrypt servers
-  const decServers = await (await req(`${WORKER_BASE}/decrypt`, {
+  const decServers = await (await req(workerUrl("decrypt"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ response: encServers }),
   })).json();
@@ -181,7 +210,7 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const servers: Array<{ name: string; description: string; data: string }> = decServers.data;
   if (!Array.isArray(servers) || !servers.length) throw new Error("VidFast2: no servers");
 
-  // 6. Get encrypted stream from vidfast.vc via CF Worker /vc-proxy
+  // 6. Get encrypted stream from vidfast.vc via same-origin proxy
   const best = servers.find((s) => s.name === "vRapid") || servers[0];
   const streamRes = await req(vcUrl(`/${staticPath}/${streamPath}/${best.data}`), {
     method: "POST",
@@ -190,7 +219,7 @@ async function scrapeVidFast2(ctx: ScrapeContext) {
   const encStream = await streamRes.text();
 
   // 7. Decrypt stream
-  const decStream = await (await req(`${WORKER_BASE}/decrypt`, {
+  const decStream = await (await req(workerUrl("decrypt"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ response: encStream }),
   })).json();

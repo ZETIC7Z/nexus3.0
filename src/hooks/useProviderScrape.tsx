@@ -8,6 +8,7 @@ import { getProviders } from "@/backend/providers/providers";
 
 
 import { checkIsAnime, getAllowedSourceIds } from "@/providers/allowed-providers";
+import { getServerEmbedLabel } from "@/providers/embeds/shared";
 import { getMediaKey } from "@/stores/player/slices/source";
 import { usePlayerStore } from "@/stores/player/store";
 import { usePreferencesStore } from "@/stores/preferences";
@@ -102,10 +103,13 @@ function useBaseScrape() {
           const source = getCachedMetadata().find(
             (src) => src.id === v.embedScraperId,
           );
+          // Show the REAL server name (Prime / Orbit / Euro) instead of the
+          // generic "Server N" label the embed was registered with.
+          const serverLabel = getServerEmbedLabel(v.embedScraperId);
           // Gracefully handle unknown embed IDs instead of crashing
           const out: ScrapingSegment = {
             embedId: v.embedScraperId,
-            name: source?.name ?? v.embedScraperId,
+            name: serverLabel ?? source?.name ?? v.embedScraperId,
             id: v.id,
             status: "waiting",
             percentage: 0,

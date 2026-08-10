@@ -14,6 +14,7 @@ import { playerStatus } from "@/stores/player/slices/source";
 import { usePlayerStore } from "@/stores/player/store";
 import { usePreferencesStore } from "@/stores/preferences";
 import { isAnimeByTitle, getAllowedSourceIds } from "@/providers/allowed-providers";
+import { getPackedEmbedLabel } from "@/providers/embeds/shared";
 
 export interface SourceSelectionViewProps {
   id: string;
@@ -37,9 +38,12 @@ export function EmbedOption(props: {
 
   const embedName = useMemo(() => {
     if (!props.embedId) return unknownEmbedName;
+    // Prefer the real server name packed by the source (Prime / Orbit / Euro).
+    const packedLabel = getPackedEmbedLabel(props.url);
+    if (packedLabel) return packedLabel;
     const sourceMeta = getCachedMetadata().find((s) => s.id === props.embedId);
     return sourceMeta?.name ?? unknownEmbedName;
-  }, [props.embedId, unknownEmbedName]);
+  }, [props.embedId, props.url, unknownEmbedName]);
 
   const { run, errored, loading, notFound } = useEmbedScraping(
     props.routerId,

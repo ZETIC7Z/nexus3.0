@@ -31,8 +31,42 @@ export const EMBED_API_BASE =
     "https://stycanine1-tmdb-embed-api.hf.space"
   ).replace(/\/$/, "");
 
-export const EMBED_REQUEST_TIMEOUT = 20_000;
-export const PROBE_TIMEOUT = 5_000;
+export const EMBED_REQUEST_TIMEOUT = 12_000;
+export const PROBE_TIMEOUT = 3_500;
+
+// ---------------------------------------------------------------------------
+// Server-name registry — real server names (Prime / Orbit / Horizon / Euro …)
+// written by a standalone source when it ranks its servers, read by the
+// spinner + settings menu so they never show generic "Server N" labels.
+// Keys are the numbered embed ids (nexus-server-1 … nexus-server-6).
+// ---------------------------------------------------------------------------
+const serverLabelCache: Record<string, string> = {};
+
+export function setServerEmbedLabels(labels: string[]): void {
+  labels.forEach((label, i) => {
+    if (label) serverLabelCache[`nexus-server-${i + 1}`] = label;
+  });
+}
+
+export function getServerEmbedLabel(embedId: string): string | undefined {
+  return serverLabelCache[embedId];
+}
+
+/**
+ * Read the packed server label from an embed's URL (JSON with a `label`
+ * field) so the UI can show the real server name without a registry lookup.
+ */
+export function getPackedEmbedLabel(url: string): string | undefined {
+  try {
+    const parsed = JSON.parse(url);
+    if (parsed && typeof parsed.label === "string" && parsed.label) {
+      return parsed.label;
+    }
+  } catch {
+    /* plain URL — no extras */
+  }
+  return undefined;
+}
 
 // ---------------------------------------------------------------------------
 // API response shapes
@@ -263,6 +297,30 @@ export async function rankStreams(
     if (a.latency !== null && b.latency !== null) return a.latency - b.latency;
     return 0;
   });
+}
+
+/**
+ * Derive a short human-readable server name from an API item, stripping the
+ * provider prefix so "Vidcore (Prime)" → "Prime", "VidUp (Euro)" → "Euro",
+ * "AniKoto - Vidstream-2 (sub)" → "Vidstream-2 (sub)". Falls back to the raw
+ * name when there is nothing to strip.
+ */
+export function deriveServerLabel(
+  item: EmbedStreamItem,
+  index: number,
+): string {
+  const raw = (item.server || item.title || item.name || "").trim();
+  if (!raw) return `Server ${index + 1}`;
+  // Strip leading emoji / flags (e.g. "🌐 1080p - MPV Player").
+  const noEmoji = raw
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  // Remove the leading provider-name segment before the first "(" or " - ".
+  const stripped = noEmoji.replace(/^[^()]*?[(-]\s*/u, "").trim();
+  const clean = stripped.replace(/[()]/g, "").trim();
+  if (!clean) return noEmoji || raw;
+  return clean;
 }
 
 export function pickUsable(ranked: RankedStream[]): RankedStream[] {
@@ -560,6 +618,41 @@ export function makeEmbedProvider(opts: {
 }
 
 /**
+ * NoTorrent — the TMDB-Embed API backend for notorrent (addon-osvh.onrender.com)
+ * is suspended and always returns 0 streams. Instead we query the public
+ * NoTorrent Stremio addon directly through the same-origin /api/notorrent
+ * proxy (Vercel function in prod, Vite middleware in dev), which resolves the
+ * addon's /redirect 302s server-side and returns final playable URLs.
+ */
+async function scrapeNotorrentItems(ctx: any): Promise<EmbedStreamItem[]> {
+  const media = ctx.media;
+  const id = media?.imdbId;
+  // The addon needs an IMDb id — without one we can't query it.
+  if (!id) return [];
+  const type = media.type === "movie" ? "movie" : "series";
+  const params = new URLSearchParams({ type, id });
+  if (media.type === "show" && media.season && media.episode) {
+    params.set("season", String(media.season.number));
+    params.set("episode", String(media.episode.number));
+  }
+  const res = await fetch(`/api/notorrent?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(EMBED_REQUEST_TIMEOUT),
+  });
+  if (!res.ok) return [];
+  const json: EmbedApiResponse = await res.json();
+  if (!json?.success) return [];
+  return (json.streams ?? []).map((s) => ({
+    name: s.name,
+    server: s.server || s.name,
+    title: s.title,
+    url: s.url,
+    quality: s.quality || "unknown",
+    type: s.type,
+  }));
+}
+
+/**
  * Create a standalone source provider from an embed backend.
  * Each provider becomes its own source in the player's source list.
  */
@@ -577,9 +670,21 @@ export function makeStandaloneSource(opts: {
     rank,
     async scrape(ctx: any) {
       try {
-        const apiUrl = buildEmbedUrl(backend, ctx);
-        const data = await fetchEmbedApi(apiUrl);
-        const items = data.streams ?? [];
+        // NoTorrent is special — its embed-API backend is dead, so query the
+        // public Stremio addon directly (falls back to the embed API on empty).
+        let items: EmbedStreamItem[] = [];
+        if (backend === "notorrent") {
+          items = await scrapeNotorrentItems(ctx);
+          if (items.length === 0) {
+            const apiUrl = buildEmbedUrl(backend, ctx);
+            const data = await fetchEmbedApi(apiUrl);
+            items = data.streams ?? [];
+          }
+        } else {
+          const apiUrl = buildEmbedUrl(backend, ctx);
+          const data = await fetchEmbedApi(apiUrl);
+          items = data.streams ?? [];
+        }
         if (items.length === 0) throw new NotFoundError(`${name}: no sources`);
 
         const ranked = await rankStreams(items);
@@ -619,7 +724,10 @@ export function makeStandaloneSource(opts: {
 
         // Return all working servers as numbered embeds so user can pick.
         // Pack captions + audio info alongside the URL so the server embed
-        // can build a complete stream with subtitles.
+        // can build a complete stream with subtitles. Labels carry the REAL
+        // server name (Prime / Orbit / Euro …) so the UI never shows "Server N".
+        const labels = mainPool.map((r, i) => deriveServerLabel(r.item, i));
+        setServerEmbedLabels(labels);
         return {
           embeds: mainPool.map((r, i) => ({
             embedId: `nexus-server-${i + 1}`,
@@ -627,7 +735,7 @@ export function makeStandaloneSource(opts: {
               url: r.item.url,
               captions: extractCaptions(r.item, `${id}-srv${i + 1}`),
               quality: r.quality,
-              label: r.item.server || r.item.title || `Server ${i + 1}`,
+              label: labels[i],
             }),
           })),
           stream: [],

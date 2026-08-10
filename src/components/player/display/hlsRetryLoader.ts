@@ -70,13 +70,50 @@ const MAX_DELAY = 3000;
 // The TMDB-Embed backend rewrites every HLS segment to its own /ts-proxy and
 // serves CORS `*`, so those URLs are already playable straight — wrapping
 // them in the generic destination proxy breaks playback.
+//
+// The embed backend rewrites segment lines but leaves EXT-X-MAP init URIs
+// raw (e.g. https://paperzebra.top/.../init-s1080p-v1-a1.mp4). Those raw CDN
+// hosts require a Referer (403 without), and the generic destination proxy
+// also 403s on them. The embed backend's own /ts-proxy forwards the proper
+// Referer and serves CORS `*` — so rewrite raw init URLs through it, exactly
+// like the backend rewrites segments.
+const EMBED_RAW_CDN_HOSTS = ["paperzebra.top"];
+const EMBED_PROXY_BASE = "https://stycanine1-tmdb-embed-api.hf.space";
+
 function isAlreadyProxiedHlsUrl(url: string): boolean {
   if (!url) return false;
   if (url.includes("m3u8-proxy") || url.includes("ts-proxy")) return true;
   try {
-    return new URL(url).hostname.endsWith("stycanine1-tmdb-embed-api.hf.space");
+    const host = new URL(url).hostname;
+    return host.endsWith("stycanine1-tmdb-embed-api.hf.space");
   } catch {
     return false;
+  }
+}
+
+// EXT-X-MAP init segments (and any other leftover raw segment) on embed CDN
+// hosts get proxied through the embed backend's /ts-proxy so the Referer the
+// CDN requires is attached and CORS is served.
+function rewriteRawEmbedCdnUrl(url: string): string | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname;
+    const isRawEmbedHost = EMBED_RAW_CDN_HOSTS.some(
+      (h) => host === h || host.endsWith(`.${h}`),
+    );
+    if (!isRawEmbedHost) return null;
+    const params = new URLSearchParams({ url });
+    params.set(
+      "headers",
+      JSON.stringify({
+        Referer: "https://vidcore.net/",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+      }),
+    );
+    return `${EMBED_PROXY_BASE}/ts-proxy?${params.toString()}`;
+  } catch {
+    return null;
   }
 }
 
@@ -86,7 +123,13 @@ export class ArtemisRetryLoader extends DefaultLoader {
   load(context: any, config: any, callbacks: any): void {
     let url: string = context?.url ?? "";
 
-    if (
+    // Raw embed-CDN URLs (EXT-X-MAP init segments) must go through the embed
+    // backend's /ts-proxy — it attaches the required Referer and serves CORS.
+    const embedProxied = rewriteRawEmbedCdnUrl(url);
+    if (embedProxied) {
+      context.url = embedProxied;
+      url = embedProxied;
+    } else if (
       !isExtensionActiveCached() &&
       !isEncryptedSiteSegmentProxy(url) &&
       !isAlreadyProxiedHlsUrl(url)
