@@ -119,8 +119,13 @@ function rewritePlaylist(text, baseUrl, queryHeaders) {
 }
 
 export default async function handler(req, res) {
-  // Accept both path-style (/m3u8-proxy?url=...) and query-param (?path=m3u8-proxy&url=...).
-  let rawPath = req.query?.path || "";
+  // Accept: path-style (/m3u8-proxy?url=...), Vercel rewrite (?sp=m3u8-proxy), legacy (?path=m3u8-proxy).
+  let rawPath = "";
+  // Vercel rewrite uses ?sp= to avoid query param conflicts
+  if (req.query?.sp) rawPath = Array.isArray(req.query.sp) ? req.query.sp[0] : req.query.sp;
+  // Legacy ?path= style
+  if (!rawPath && req.query?.path) rawPath = Array.isArray(req.query.path) ? req.query.path[0] : req.query.path;
+  // Path-style: /api/vidfast2-stream/m3u8-proxy?url=...
   if (!rawPath) {
     rawPath = (req.url || "").replace(/^.*?\/api\/vidfast2-stream\/?/, "").replace(/\?.*$/, "");
   }
@@ -141,10 +146,9 @@ export default async function handler(req, res) {
 
   const queryHeaders = req.query?.headers || rawParams.get("headers") || null;
 
-  const headers = {
+  // Default: neutral headers. Override with queryHeaders if provided.
+  const headers: any = {
     Accept: "*/*",
-    Referer: "https://vidfast.vc/",
-    Origin: "https://vidfast.vc",
     "User-Agent": BROWSER_UA,
   };
   if (queryHeaders) {
@@ -152,6 +156,14 @@ export default async function handler(req, res) {
       Object.assign(headers, JSON.parse(queryHeaders));
     } catch {
       /* ignore malformed headers param */
+    }
+  }
+  // Fallback Referer: use the CDN URL's origin (works for most providers).
+  if (!headers.Referer && !headers.Referrer) {
+    try {
+      headers.Referer = new URL(streamUrl).origin + "/";
+    } catch {
+      headers.Referer = "https://vidfast.vc/";
     }
   }
 

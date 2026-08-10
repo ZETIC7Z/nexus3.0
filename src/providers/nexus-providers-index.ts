@@ -86,10 +86,16 @@ const makeServerEmbed = (n: number) => makeEmbedContext({
       // plain URL — no extras
     }
     const isHls = url.includes(".m3u8") || url.includes("m3u8-proxy");
+    // Route external HLS through same-origin stream proxy (like Zephyr).
+    // This avoids the broken destination proxy (getLoadbalancedProxyUrl)
+    // and works on all browsers including mobile native HLS.
+    const playlistUrl = isHls && !url.includes("m3u8-proxy") && !url.includes("/api/vidfast2-stream")
+      ? `/api/vidfast2-stream/m3u8-proxy?url=${encodeURIComponent(url)}`
+      : url;
     return {
       embeds: [],
       stream: [isHls
-        ? { id: `srv${n}-hls`, type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language, url, default: true }] }
+        ? { id: `srv${n}-hls`, type: "hls", playlist: playlistUrl, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language, url, default: true }] }
         : { id: `srv${n}-mp4`, type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language, url, default: true }] }
       ],
     };
