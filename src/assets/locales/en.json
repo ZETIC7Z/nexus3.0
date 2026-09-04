@@ -249,7 +249,9 @@
       "passkeyDescription": "Please authenticate with your passkey to complete registration.",
       "authenticatePasskey": "Authenticate with Passkey",
       "passkeyError": "Passkey verification failed"
-    }
+    },
+    "nicknameLabel": "Nickname",
+    "nicknamePlaceholder": "e.g., Sam"
   },
   "errors": {
     "badge": "It broke",
@@ -431,8 +433,10 @@
       "placeholder": {
         "default": "What do you want to watch?",
         "extra": [
+          "What would you like to watch?",
+          "Search movies, TV shows, or genres...",
+          "Type a movie name, actor, or mood...",
           "What are you in the mood for?",
-          "What do you want to stream?",
           "What's on your watchlist today?",
           "How was your day?",
           "My bad the site never works...",
@@ -460,7 +464,7 @@
       "69": {
         "default": "What would you like to watch this.. day?",
         "extra": [
-          "Viva la NEXUS!"
+          "nice."
         ]
       },
       "420": {
@@ -472,19 +476,31 @@
       "day": {
         "default": "What would you like to watch this afternoon?",
         "extra": [
-          "Viva la NEXUS!"
+          "Afternoon movie break?",
+          "Time for a matinee!",
+          "Ready for movie night? Let's find a show.",
+          "Popcorn o'clock.",
+          "What are we watching this afternoon?"
         ]
       },
       "morning": {
         "default": "What would you like to watch this morning?",
         "extra": [
-          "Viva la NEXUS!"
+          "Rise and shine! Coffee first, then a movie?",
+          "Good morning! Start the day with a good show.",
+          "Breakfast + an episode = perfect combo.",
+          "Early bird binge session?",
+          "The morning lineup awaits."
         ]
       },
       "night": {
         "default": "What would you like to watch tonight?",
         "extra": [
-          "Viva la NEXUS!"
+          "Movie night? Let's find something great.",
+          "Tonight's pick: comedy or thriller?",
+          "Lights off, blanket on, movie on.",
+          "One more episode won't hurt.",
+          "What's your plan tonight?"
         ]
       },
       "halloween": {
@@ -508,6 +524,51 @@
       "donate": "Donate",
       "label": "Project Funding: ${{current}} / ${{goal}}",
       "complete": "complete"
+    },
+    "greetings": {
+      "69": {
+        "default": "What would you like to watch this.. day, {{name}}?",
+        "extra": [
+          "nice, {{name}}."
+        ]
+      },
+      "420": {
+        "default": "Happy 4/20, {{name}}! What are we watching?",
+        "extra": [
+          "The vibes are right, {{name}}."
+        ]
+      },
+      "morning": {
+        "default": "Good morning, {{name}}! What are we watching?",
+        "extra": [
+          "Morning, {{name}}! Coffee and a show?",
+          "Welcome back, {{name}}! Start the day right.",
+          "Hey {{name}}, what's the plan this morning?"
+        ]
+      },
+      "day": {
+        "default": "Welcome back, {{name}}! What are we watching today?",
+        "extra": [
+          "Afternoon, {{name}}! Picking something good?",
+          "Hey {{name}}, movie break?",
+          "Ready when you are, {{name}}."
+        ]
+      },
+      "night": {
+        "default": "Welcome back, {{name}}! What are we watching tonight?",
+        "extra": [
+          "Evening, {{name}}! Movie night?",
+          "Hey {{name}}, one more episode?",
+          "Tonight's the night, {{name}}. What'll it be?",
+          "What's your plan tonight, {{name}}?"
+        ]
+      },
+      "halloween": {
+        "default": "Happy Halloween, {{name}}! Pick something spooky.",
+        "extra": [
+          "Boo, {{name}}! 👻"
+        ]
+      }
     }
   },
   "media": {
@@ -1259,7 +1320,12 @@
         "unknownDevice": "Unknown device, error decrypting name",
         "failed": "Failed to load sessions",
         "removeDevice": "Remove",
-        "title": "Devices"
+        "title": "Devices",
+        "current": "This device",
+        "lastAccessed": "Last active",
+        "removeConfirmTitle": "Remove this device?",
+        "removeConfirmBody": "Do you want to remove this device from your account? The device will be logged out and will need to sign in again to access your account.",
+        "removeConfirmYes": "Yes, remove"
       },
       "profile": {
         "finish": "Finish editing",

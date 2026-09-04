@@ -43,7 +43,7 @@ export interface NexusNotification {
 // ---------------------------------------------------------------------------
 
 const NEXUS_RELEASES_URL =
-  "https://api.github.com/repos/ZETIC7Z/NEXUS/releases/latest";
+  "https://api.github.com/repos/ZETIC7Z/nexus3.0/releases/latest";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // Every 6 hours
 
 interface GitHubRelease {
@@ -81,6 +81,8 @@ export const useNotificationStore = create<NotificationState>()(
 
       addNotification(notif) {
         set((state) => {
+          // Auto-delete: drop anything older than 30 days while we're here.
+          pruneOld(state);
           // Avoid duplicate notifications of the same type+version
           const isDuplicate = state.notifications.some(
             (n) =>
@@ -160,6 +162,32 @@ export function selectUnreadCount(state: NotificationState): number {
 
 export function selectNotifications(state: NotificationState): NexusNotification[] {
   return [...state.notifications].sort((a, b) => b.timestamp - a.timestamp);
+}
+
+// ---------------------------------------------------------------------------
+// 30-day auto-delete — notifications expire one month after their timestamp
+// ---------------------------------------------------------------------------
+
+const NOTIFICATION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Remove notifications older than 30 days (runs on boot + on every add). */
+export function pruneOldNotifications(): void {
+  useNotificationStore.setState((state) => {
+    const cutoff = Date.now() - NOTIFICATION_MAX_AGE_MS;
+    const kept = state.notifications.filter((n) => n.timestamp >= cutoff);
+    if (kept.length === state.notifications.length) return state;
+    return { ...state, notifications: kept };
+  });
+}
+
+/** Immer-friendly in-place prune used inside store actions. */
+function pruneOld(state: { notifications: NexusNotification[] }): void {
+  const cutoff = Date.now() - NOTIFICATION_MAX_AGE_MS;
+  if (state.notifications.some((n) => n.timestamp < cutoff)) {
+    state.notifications = state.notifications.filter(
+      (n) => n.timestamp >= cutoff,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +301,7 @@ export function notifyInfo(title: string, description: string, actionUrl?: strin
 // v3.0 Changelog — auto-posted on first launch after update
 // ---------------------------------------------------------------------------
 
-const V3_CHANGELOG_VERSION = "3.1.0";
+const V3_CHANGELOG_VERSION = "3.2.0";
 
 /** Format the current time in Philippine Standard Time (UTC+8). */
 export function formatPHTime(date: Date = new Date()): string {
@@ -301,22 +329,18 @@ export function announceV3Changelog(): void {
 
   store.addNotification({
     type: "info",
-    title: `🎉 NEXUS 3.0 — Major Update (${phNow})`,
+    title: `🎉 NEXUS 3.2 — Faster, Smarter, Personalized (${phNow})`,
     description:
       "What's new today:\n" +
-      "• 8 flat sources: Zephyr, NoTorrent, VidCore, Videasy, VidUp, VidFast, AniKoto, AniKai\n" +
-      "• Numbered server selection + smart failover (next server → next source)\n" +
-      "• Real latency probing — dead/geo-blocked servers auto-skipped\n" +
-      "• Audio tracks with country flags: 🇯🇵 Japanese default for anime, dubs selectable\n" +
-      "• Auto English subtitles on by default — just hit play\n" +
-      "• 🇵🇭 Country Top 10 on Discover (api.country.is detection)\n" +
-      "• Kids Profile with content filtering + route guards\n" +
-      "• Profile selection with avatars (AvatarPicker, ConflixAvatar)\n" +
-      "• Subtitle passthrough from API to player captions\n" +
-      "• 4K quality detection & ranking\n" +
-      "• Dead providers removed: VidLink, VixSrc, Nyxos, MovieBox, Strix, Xylos, Vexis, Morvyn\n" +
-      "• “Failed to scrape” bug fixed (empty stream[] truthiness)\n" +
-      "• Everything plays directly — no browser extension needed\n" +
+      "• ⚡ Massive speed boost: first load is ~60% lighter — heavy features now load only when used\n" +
+      "• 👋 Personalized greetings: time-aware welcome text (morning/afternoon/night, your timezone) + your nickname when signed in\n" +
+      "• 🏳️ Top 10 in Your Country now shows your country's flag instead of a globe icon\n" +
+      "• 🔔 Smart popup system: maintenance & update notices share one slot, fade in/out, auto-close after 15s\n" +
+      "• 🧹 Notifications auto-delete after 30 days — no more endless backlogs\n" +
+      "• ⬇️ MKV downloads preload with the stream — Download menu opens instantly, only live links listed\n" +
+      "• 🍠 Yamie provider for movies (auto-hidden when offline or on TV shows)\n" +
+      "• 📱 Smoother mobile playback: device-aware buffering, data-friendly quality caps\n" +
+      "• 🐛 Fixed: MKV links wrongly filtered, TMDB rows on production, subtitle retry storms, dead-proxy stalls\n" +
       `Released: ${phNow}`,
     version: V3_CHANGELOG_VERSION,
     autoDismissMs: 0,
@@ -328,6 +352,9 @@ export function announceV3Changelog(): void {
 // ---------------------------------------------------------------------------
 
 export function initNotifications(): () => void {
+  // Auto-delete expired notifications (older than 30 days) on boot.
+  pruneOldNotifications();
+
   // Initial check
   void checkForUpdates();
 

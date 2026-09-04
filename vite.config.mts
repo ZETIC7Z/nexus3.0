@@ -9,7 +9,7 @@ import checker from "vite-plugin-checker";
 import { handlebars } from "./plugins/handlebars";
 import { streamProxyPlugin } from "./plugins/stream-proxy";
 import { downloadsApiPlugin } from "./plugins/downloads-api";
-import { PluginOption, loadEnv, splitVendorChunkPlugin } from "vite";
+import { PluginOption, loadEnv } from "vite";
 import { visualizer } from "rollup-plugin-visualizer";
 
 import tailwind from "tailwindcss";
@@ -88,7 +88,16 @@ export default defineConfig(({ mode }) => {
         registerType: "autoUpdate",
         workbox: {
           maximumFileSizeToCacheInBytes: 4000000, // 4mb
-          globIgnores: ["!assets/**/*"],
+          // Heavy on-demand chunks (voice AI, translation DB, locale packs)
+          // are excluded from the install-time precache so a first visit
+          // doesn't download them in the background and compete with the
+          // app shell. They are still fetched + runtime-cached on use.
+          globIgnores: [
+            "assets/transformers*.js",
+            "assets/vadWorker*.js",
+            "assets/language-db-*.js",
+            "assets/locales-*.js",
+          ],
         },
         includeAssets: [
           "favicon.ico",
@@ -149,7 +158,6 @@ export default defineConfig(({ mode }) => {
           },
         },
       }),
-      splitVendorChunkPlugin(),
       visualizer() as PluginOption,
     ],
 
@@ -177,7 +185,10 @@ export default defineConfig(({ mode }) => {
             if (id.includes("react-dom")) {
               return "react-dom";
             }
-            if (id.includes("Icon.tsx")) {
+            // Exact match: a bare includes("Icon.tsx") also catches
+            // FlagIcon.tsx, which pulls the heavy language database into
+            // the boot path. Normalize windows/unix separators first.
+            if (id.split("\\").join("/").endsWith("/components/Icon.tsx")) {
               return "Icons";
             }
             const isCaptioningPackage = captioningPackages.some((packageName) =>

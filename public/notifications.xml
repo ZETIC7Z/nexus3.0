@@ -4,8 +4,71 @@
     <title>NEXUS Notifications</title>
     <description>Site updates, feature announcements, and important alerts for NEXUS users</description>
     <language>en</language>
-    <lastBuildDate>Fri, 04 Sep 2026 13:30:00 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 05 Sep 2026 00:15:00 +0800</lastBuildDate>
+    <item>
+      <guid>nexus-notif-2026-09-05-v32-tipjar-devices</guid>
+      <title>🎁 Tip Jar &amp; Device Security — NEXUS 3.2 final polish</title>
+      <description>The last batch of polish, just in time for the v3.2 launch (Sep 5, 2026):
+
+**🎁 Tip Jar &amp; support**
+• The maintenance bar now opens a proper Tip Jar with your real donation channels: Wise, PayPal, GoTyme (PH), GCash, Stripe (Buy Me a Coffee) and Binance
+• The Tip Jar menu icon glows with the same gradient animation as the Discover button
+
+**🛡️ Device security (like the big platforms)**
+• The app now detects the real device brand &amp; model, the OS, and the browser you sign in with (e.g. “Poco X6 Pro 5G · Android · Chrome”) instead of a generic “username's device”
+• Your account shows a Device list with the login time &amp; date for each session
+• Each device has an ✕ remove button with a confirmation dialog — removing a device logs it out from your account
+
+**👤 Proper nicknames**
+• The sign-up form now calls the field Nickname (not “Device name”)
+• Greetings and your profile name use your nickname — never your device name
+
+**⏱️ Popups &amp; announcements**
+• Maintenance and update popups now stay for 15 seconds before fading out (was 3.5s)
+• The announcement bar text is cleaner and stays the original compact size
+
+Thank you for streaming with NEXUS! 🍿
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 05 Sep 2026 00:15:00 +0800</pubDate>
+      <category>update</category>
+    </item>
     
+    <item>
+      <guid>nexus-notif-2026-09-04-v32-speed-greetings-flag</guid>
+      <title>🎉 NEXUS 3.2 — Big Speed Boost, Personalized Greetings &amp; Top 10 Flags</title>
+      <description>The site just got faster and friendlier (Sep 4, 2026):
+
+**⚡ Performance overhaul**
+• First load is ~60% lighter — translations, language database, hls.js and other heavy features now load only when actually used
+• Smaller install-time precache, so first visit stops fighting background downloads
+• Faster search view and notification center via smarter code loading
+
+**👋 Personalized greetings**
+• The homepage greeting now follows YOUR timezone: fresh morning / afternoon / night messages
+• Signed in? We greet you by name — "Welcome back, Sam! What are we watching tonight?"
+• New search bar placeholder suggestions to keep things fresh
+
+**🏳️ Top 10 in Your Country**
+• The globe icon is replaced with your country's real flag — same flag set as the subtitle picker
+
+**🔔 Smarter notifications &amp; popups**
+• Maintenance and update popups now share one clean spot: first one shows, fades out, then the next appears — each auto-closes after 15 seconds with smooth in/out animations
+• Notifications older than 30 days now auto-delete themselves
+• This changelog is posted automatically with every update from now on
+
+**🛠 Also in this release**
+• MKV downloads preload together with the stream — the Download menu is instant
+• Yamie movie provider with automatic liveness checks
+• Mobile-aware player buffering for smooth playback on any device
+• Fixed: MKV links wrongly filtered, TMDB rows on production, subtitle retry storms, dead-proxy stalls
+
+Thank you for streaming with NEXUS! 🍿
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 04 Sep 2026 22:30:00 +0800</pubDate>
+      <category>update</category>
+    </item>
     <item>
       <guid>nexus-notif-2026-09-04-yamie-downloads-mobile</guid>
       <title>⚡ Yamie Provider, Instant Downloads &amp; Mobile Smoothness Update</title>

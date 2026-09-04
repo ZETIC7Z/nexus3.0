@@ -4,8 +4,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 
-import i18n from "@/setup/i18n";
-import { getLocaleInfo } from "@/utils/locale/language";
+import { ensureLanguageLoaded } from "@/setup/i18n";
+import { getLightLocaleInfo } from "@/utils/locale/language";
 
 export interface LanguageStore {
   language: string;
@@ -27,14 +27,13 @@ export const useLanguageStore = create(
 );
 
 export function changeAppLanguage(language: string) {
-  const lang = getLocaleInfo(language);
-  if (lang) i18n.changeLanguage(lang.code);
+  // ensureLanguageLoaded lazy-loads the locale bundle, resolves regional
+  // variants and falls back to English when a locale cannot load.
+  void ensureLanguageLoaded(language);
 }
 
 export function isRightToLeft(language: string) {
-  const lang = getLocaleInfo(language);
-  if (!lang) return false;
-  return lang.isRtl;
+  return getLightLocaleInfo(language).isRtl === true;
 }
 
 export function LanguageProvider() {

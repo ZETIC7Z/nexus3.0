@@ -11,7 +11,38 @@
 
 ---
 
-## 🚀 What's New — Sep 4, 2026
+## 🚀 What's New — Sep 4, 2026 (v3.2)
+
+### ⚡ Performance Overhaul (the big one)
+First load used to pull **5.7 MB of JavaScript** — now it's **~2.3 MB (−60%)**:
+- **Lazy locales** — only `en.json` (72K) ships at boot; your language's translation loads on demand (~1.2 MB saved)
+- **Language database split** — the 1.1 MB country/language DB now loads only in settings UI
+- **hls.js off the boot path** — the 510 KB player engine loads with the player, not the homepage
+- **Lazy caption pipeline** — subtitle parsing/downloading loads only when captions are used
+- **PWA precache trim** — the service worker no longer precaches voice-AI chunks (transformers/VAD) and locale packs; they cache on first use instead
+- Fixed a chunking bug where `FlagIcon` silently dragged the language DB into the entry chunk
+
+### 👋 Personalized Greetings
+- Time-aware greeting that follows **your** timezone (morning/afternoon/night buckets)
+- Random rotating headlines — "Movie night? Let's find something great.", "What's your plan tonight?", and more
+- **Signed in?** It greets you by name: "Welcome back, Sam! What are we watching tonight?" (name from your account, decrypted locally)
+- Refreshed search-bar placeholders
+
+### 🏳️ Top 10 in Your Country — Flag Edition
+The globe icon on the Top 10 row is replaced with the **detected country's real flag** (same flag set as the subtitle picker).
+
+### 🔔 Smart Popup System
+- The **Maintenance** and **App Update** popups now share **one top-center slot** — no stacking
+- Popup 1 shows → fades out after 15 s → popup 2 shows → auto-closes after 15 s
+- Smooth slide/fade in **and** out animations; clean single-popup layout on mobile
+- **Notifications auto-delete after 30 days** (both the in-app store and the RSS feed filter)
+
+### 🍿 Everything from earlier today
+- Yamie movie-only provider (probe-gated), preloaded MKV/subtitle downloads, mobile-aware buffering, dead-proxy memory, liveness-checked MKV links, cleaner console
+
+---
+
+### 🍿 Earlier today (v3.1)
 
 ### Yamie Provider (movies)
 New movie-only source backed by a direct HLS endpoint (`media.vidrift.in/movie_{tmdbId}/vod.m3u8`). It is built client-side from the TMDB id — no backend round-trip — and is probed before being offered, so it only appears when it is actually online. TV shows never see it.
@@ -294,6 +325,21 @@ plugins/                           ← Vite dev-server shims for the api/ functi
 ---
 
 ## Changelog
+
+### Sep 4, 2026 (v3.2 — evening)
+- **Performance overhaul** — first-load JS 5.7 MB → 2.3 MB (lazy locales, language-db split, hls.js off boot path, lazy caption pipeline, PWA precache trim)
+- **Personalized greetings** — timezone-aware + nickname for signed-in users (useUserDisplayName)
+- **Top 10 flag** — globe icon replaced with detected country flag
+- **Popup queue** — maintenance + update popups share one slot, 15 s auto-close, in/out animations
+- **Notification 30-day auto-delete** — store prune + RSS feed filter
+- **In-app changelog v3.2** + automatic notification posting made a mandatory routine
+
+### Sep 5, 2026 (v3.2 — final polish)
+- **Tip Jar** — the maintenance bar opens a real donation modal with Wise, PayPal, GoTyme (PH), GCash, Stripe (Buy Me a Coffee) and Binance; the menu icon glows like the Discover button
+- **Device security** — detects the real device brand/model, OS and browser per login; Account → Devices lists each session with time/date; ✕ removes a device (with confirm) and logs it out
+- **Nicknames** — sign-up field is now “Nickname”; greetings & profile show your nickname, never the device name
+- **Popup duration** — maintenance & update popups stay 15s before auto-fading (was 3.5s)
+- **Announcement bar** — cleaner text, original compact size preserved
 
 ### Sep 4, 2026
 - **Yamie provider** — movie-only direct HLS source (`media.vidrift.in`), probe-gated

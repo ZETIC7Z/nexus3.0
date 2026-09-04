@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useBackendUrl } from "@/hooks/auth/useBackendUrl";
 import { useAuthStore } from "@/stores/auth";
+import { detectDeviceLabel } from "@/utils/common/device";
 import { useBookmarkStore } from "@/stores/bookmarks";
 import { useProgressStore } from "@/stores/progress";
 import { markNewSignup } from "@/stores/profiles";
@@ -62,7 +63,7 @@ export function AuthModal({ id }: { id: string }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [deviceName, setDeviceName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loginMode, setLoginMode] = useState<"password" | "passkey">("password");
@@ -114,7 +115,7 @@ export function AuthModal({ id }: { id: string }) {
         setUsername("");
         setPassword("");
         setConfirmPassword("");
-        setDeviceName("");
+        setNickname("");
         setSuccessMessage(null);
         setMnemonic("");
         setPasskeyConnected(false);
@@ -141,7 +142,7 @@ export function AuthModal({ id }: { id: string }) {
       setUsername("");
       setPassword("");
       setConfirmPassword("");
-      setDeviceName("");
+      setNickname("");
       setSuccessMessage(null);
       setMnemonic("");
       setPasskeyConnected(false);
@@ -185,7 +186,7 @@ export function AuthModal({ id }: { id: string }) {
       accountResult = await login({
         mnemonic: generatedMnemonic,
         userData: {
-          device: `${validatedUsername}'s device`,
+          device: detectDeviceLabel(),
         },
       });
     } catch (err) {
@@ -247,7 +248,7 @@ export function AuthModal({ id }: { id: string }) {
       accountResult = await login({
         credentialId: assertion.id,
         userData: {
-          device: `${validatedUsername}'s Passkey Device`,
+          device: detectDeviceLabel(),
         },
       });
     } catch (err) {
@@ -278,8 +279,9 @@ export function AuthModal({ id }: { id: string }) {
 
   // Registration handler with Username & Password
   const [registerResult, handleRegisterSubmit] = useAsyncFn(async () => {
-    const validatedDeviceName = deviceName.trim();
-    if (validatedDeviceName.length < 2) throw new Error("Device name must be at least 2 characters");
+    const validatedNickname = nickname.trim();
+    if (validatedNickname.length < 2)
+      throw new Error("Nickname must be at least 2 characters");
 
     const validatedUsername = username.trim();
     if (validatedUsername.length < 3) throw new Error("Username must be at least 3 characters");
@@ -302,7 +304,10 @@ export function AuthModal({ id }: { id: string }) {
     const accountResult = await register({
       mnemonic: generatedMnemonic,
       userData: {
-        device: validatedDeviceName,
+        // The real device is auto-detected (brand/model/OS/browser) so the
+        // Devices list shows the actual device, not a free-text label.
+        device: detectDeviceLabel(),
+        nickname: validatedNickname,
         profile: {
           colorA: "#E50914",
           colorB: "#B20710",
@@ -320,14 +325,14 @@ export function AuthModal({ id }: { id: string }) {
     // fresh signup — so a failed attempt (username taken, network error) can
     // never leave a stale flag that hides a returning user's real profiles.
     markNewSignup();
-    setAccountNickname(validatedUsername);
+    setAccountNickname(validatedNickname);
 
     setSuccessMessage("Account created successfully!");
     setTimeout(() => {
       setSuccessMessage(null);
       setMode("passphrase");
     }, 1500);
-  }, [deviceName, username, password, confirmPassword, siteKey, executeRecaptcha, register, restore, importData, progressItems, bookmarkItems, setAccountNickname, backendUrl, config.BACKEND_URL]);
+  }, [nickname, username, password, confirmPassword, siteKey, executeRecaptcha, register, restore, importData, progressItems, bookmarkItems, setAccountNickname, backendUrl, config.BACKEND_URL]);
 
   // Connect passkey right after username/password registration on passphrase screen
   const [connectPasskeyResult, handleConnectPasskey] = useAsyncFn(async () => {
@@ -654,13 +659,13 @@ export function AuthModal({ id }: { id: string }) {
                     <div className="space-y-3.5">
                       <div>
                         <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">
-                          {t("auth.deviceNameLabel") || "Device Name"}
+                          {t("auth.nicknameLabel") || "Nickname"}
                         </label>
                         <input
                           type="text"
-                          value={deviceName}
-                          onChange={(e) => setDeviceName(e.target.value)}
-                          placeholder={t("auth.deviceNamePlaceholder") || "e.g., My Laptop"}
+                          value={nickname}
+                          onChange={(e) => setNickname(e.target.value)}
+                          placeholder={t("auth.nicknamePlaceholder") || "e.g., Sam"}
                           className="w-full bg-[#1c1a2e] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors text-sm"
                         />
                       </div>

@@ -1,6 +1,5 @@
 import { detect } from "detect-browser";
 import fscreen from "fscreen";
-import Hls from "hls.js";
 
 export const isSafari = /^((?!chrome|android).)*safari/i.test(
   navigator.userAgent,
@@ -56,7 +55,13 @@ export function canWebkitPictureInPicture(): boolean {
 }
 
 export function canPlayHlsNatively(video: HTMLVideoElement): boolean {
-  if (Hls.isSupported()) return false; // no need to play natively
+  // Native Safari/iOS HLS support: prefer the platform player. On MSE-capable
+  // browsers hls.js handles playback, so "native" is only relevant when MSE
+  // is unavailable (iOS Safari, some WebViews). Checking MSE here (instead of
+  // importing hls.js) keeps the 510 KB hls chunk off the boot path.
+  if (typeof window !== "undefined" && window.MediaSource?.isTypeSupported?.("video/mp4; codecs=\"avc1.42E01E\"")) {
+    return false; // MSE-capable: hls.js will take over
+  }
   return !!video.canPlayType("application/vnd.apple.mpegurl");
 }
 

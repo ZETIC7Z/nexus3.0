@@ -15,7 +15,8 @@ import { appLanguageOptions } from "@/setup/i18n";
 import { useOverlayStack } from "@/stores/interface/overlayStack";
 import { usePreferencesStore } from "@/stores/preferences";
 import { isAutoplayAllowed } from "@/utils/media/autoplay";
-import { getLocaleInfo, sortLangCodes } from "@/utils/locale/language";
+import { getLocaleInfo } from "@/utils/locale/languageFull";
+import { sortLangCodes } from "@/utils/locale/language";
 
 function Section({
   title,

@@ -1,6 +1,6 @@
 import classNames from "classnames";
+import { useEffect, useState } from "react";
 
-import { getCountryCodeForLocale } from "@/utils/locale/language";
 import "flag-icons/css/flag-icons.min.css";
 
 export interface FlagIconProps {
@@ -9,8 +9,27 @@ export interface FlagIconProps {
 }
 
 export function FlagIcon(props: FlagIconProps) {
-  let countryCode: string | null = props.country ?? null;
-  if (props.langCode) countryCode = getCountryCodeForLocale(props.langCode);
+  // The language database (used to map a language code to a flag) is huge
+  // (~1.1 MB) so it is imported lazily and only when a langCode is given.
+  // Pure country-code usage (Top 10 row) never touches it.
+  const [langCountry, setLangCountry] = useState<string | null>(null);
+  useEffect(() => {
+    setLangCountry(null);
+    if (props.country || !props.langCode) return;
+    let alive = true;
+    import("@/utils/locale/languageFull")
+      .then(({ getCountryCodeForLocale }) => {
+        if (alive) setLangCountry(getCountryCodeForLocale(props.langCode!));
+      })
+      .catch(() => {
+        /* flag simply stays generic */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [props.country, props.langCode]);
+
+  const countryCode: string | null = props.country ?? langCountry;
 
   if (props.langCode === "tok")
     return (

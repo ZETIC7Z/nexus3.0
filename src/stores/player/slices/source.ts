@@ -2,7 +2,6 @@
 
 import { ScrapeMedia } from "@nexus/providers";
 
-import { downloadCaption } from "@/backend/helpers/subs";
 import { preloadDownloads } from "@/utils/downloadPreload";
 import { MakeSlice } from "@/stores/player/slices/types";
 import {
@@ -11,8 +10,6 @@ import {
   selectQuality,
 } from "@/stores/player/utils/qualities";
 import { useQualityStore } from "@/stores/quality";
-import googletranslate from "@/utils/translation/googletranslate";
-import { translate } from "@/utils/translation/index";
 import { useAudioTrackStore } from "@/utils/player/audioTracks";
 import { ValuesOf } from "@/utils/common/typeguard";
 
@@ -619,6 +616,7 @@ export const createSourceSlice: MakeSlice<SourceSlice> = (set, get) => ({
     }
 
     try {
+      const { downloadCaption } = await import("@/backend/helpers/subs");
       const srtData = await downloadCaption(targetCaption);
       if (abortController.signal.aborted) {
         return;
@@ -641,6 +639,8 @@ export const createSourceSlice: MakeSlice<SourceSlice> = (set, get) => ({
     }
 
     try {
+      const { translate } = await import("@/utils/translation/index");
+      const { default: googletranslate } = await import("@/utils/translation/googletranslate");
       const result = await translate(
         store.caption.translateTask!.fetchedTargetCaption!,
         targetLanguage,

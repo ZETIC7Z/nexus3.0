@@ -12,9 +12,12 @@ import {
 } from "@/components/layout/LargeCard";
 import { AuthInputBox } from "@/components/text-inputs/AuthInputBox";
 import { UserIcons } from "@/components/UserIcon";
+import { detectDeviceLabel } from "@/utils/common/device";
 
 export interface AccountProfile {
   device: string;
+  /** User-chosen nickname (the account's display name). */
+  nickname?: string;
   profile: {
     colorA: string;
     colorB: string;
@@ -29,30 +32,33 @@ interface AccountCreatePartProps {
 }
 
 export function AccountCreatePart(props: AccountCreatePartProps) {
-  const [device, setDevice] = useState("");
+  const [nickname, setNickname] = useState("");
   const [colorA, setColorA] = useState(initialColor);
   const [colorB, setColorB] = useState(initialColor);
   const [userIcon, setUserIcon] = useState<UserIcons>(initialIcon);
   const { t } = useTranslation();
-  const [hasDeviceError, setHasDeviceError] = useState(false);
+  const [hasNicknameError, setHasNicknameError] = useState(false);
 
   const nextStep = useCallback(() => {
-    setHasDeviceError(false);
-    const validatedDevice = device.trim();
-    if (validatedDevice.length === 0) {
-      setHasDeviceError(true);
+    setHasNicknameError(false);
+    const validatedNickname = nickname.trim();
+    if (validatedNickname.length === 0) {
+      setHasNicknameError(true);
       return;
     }
 
     props.onNext?.({
-      device: validatedDevice,
+      // The real device is auto-detected (brand/model/OS/browser) so the
+      // Devices list shows the actual device, not a free-text label.
+      device: detectDeviceLabel(),
+      nickname: validatedNickname,
       profile: {
         colorA,
         colorB,
         icon: userIcon,
       },
     });
-  }, [device, props, colorA, colorB, userIcon]);
+  }, [nickname, props, colorA, colorB, userIcon]);
 
   return (
     <LargeCard>
@@ -70,10 +76,10 @@ export function AccountCreatePart(props: AccountCreatePartProps) {
       </LargeCardText>
       <div className="space-y-6">
         <AuthInputBox
-          label={t("auth.deviceNameLabel") ?? undefined}
-          value={device}
-          onChange={setDevice}
-          placeholder={t("auth.deviceNamePlaceholder") ?? undefined}
+          label={t("auth.nicknameLabel") ?? undefined}
+          value={nickname}
+          onChange={setNickname}
+          placeholder={t("auth.nicknamePlaceholder") ?? undefined}
         />
         <ColorPicker
           label={t("auth.register.information.color1")}
@@ -90,7 +96,7 @@ export function AccountCreatePart(props: AccountCreatePartProps) {
           value={userIcon}
           onInput={setUserIcon}
         />
-        {hasDeviceError ? (
+        {hasNicknameError ? (
           <p className="text-authentication-errorText">
             {t("auth.login.deviceLengthError")}
           </p>

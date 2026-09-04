@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo } from "react";
-import subsrt from "subsrt-ts";
 
-import { downloadCaption, downloadWebVTT } from "@/backend/helpers/subs";
 import { Caption, CaptionListItem } from "@/stores/player/slices/source";
 import { usePlayerStore } from "@/stores/player/store";
 import { usePreferencesStore } from "@/stores/preferences";
 import { useSubtitleStore } from "@/stores/subtitles";
 
-import {
-  filterDuplicateCaptionCues,
-  parseVttSubtitles,
-} from "../utils/captions";
 
 // Captions whose download already failed this session (CORS-blocked hosts,
 // dead URLs). Auto-select never retries them, keeping the console clean.
@@ -111,6 +105,7 @@ export function useCaptions() {
 
       if (!caption.hls) {
         try {
+          const { downloadCaption } = await import("@/backend/helpers/subs");
           const srtData = await downloadCaption(caption);
           captionToSet.srtData = srtData;
         } catch (err) {
@@ -133,14 +128,18 @@ export function useCaptions() {
         const vttCaptions = (
           await Promise.all(
             fragments.map(async (frag) => {
+              const { downloadWebVTT } = await import("@/backend/helpers/subs");
               const vtt = await downloadWebVTT(frag.url);
+              const { parseVttSubtitles } = await import("../utils/captions");
               return parseVttSubtitles(vtt);
             }),
           )
         ).flat();
 
+        const { filterDuplicateCaptionCues } = await import("../utils/captions");
         const filtered = filterDuplicateCaptionCues(vttCaptions);
 
+        const { default: subsrt } = await import("subsrt-ts");
         const srtData = subsrt.build(filtered, { format: "srt" });
         captionToSet.srtData = srtData;
       }

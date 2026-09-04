@@ -25,7 +25,6 @@ import { DownloadModal } from "@/components/overlays/downloadModal";
 import { GamepadControlsModal } from "@/components/overlays/GamepadControlsModal";
 import { KeyboardCommandsEditModal } from "@/components/overlays/KeyboardCommandsEditModal";
 import { KeyboardCommandsModal } from "@/components/overlays/KeyboardCommandsModal";
-import { NotificationModal } from "@/components/overlays/notificationsModal";
 import { SupportInfoModal } from "@/components/overlays/SupportInfoModal";
 import { TipJarModal } from "@/components/overlays/tipJarModal";
 import { SimklAuthHandler } from "@/components/auth/SimklAuthHandler";
@@ -68,6 +67,9 @@ import { useClearModalsOnNavigation } from "@/stores/interface/overlayStack";
 import { LanguageProvider } from "@/stores/language";
 import { conf } from "@/setup/config";
 
+const NotificationModal = lazy(() =>
+  import("@/components/overlays/notificationsModal").then((m) => ({ default: m.NotificationModal })),
+);
 const AdminPage = lazy(() => import("@/pages/admin/AdminPage").then((module) => ({ default: module.AdminPage })));
 const DeveloperPage = lazy(() => import("@/pages/DeveloperPage"));
 const TestView = lazy(() => import("@/pages/developer/TestView"));
@@ -286,7 +288,9 @@ function App() {
       <LanguageProvider />
       <UpdateNotice />
       <AuthModal id="auth" />
-      <NotificationModal id="notifications" />
+      <Suspense fallback={null}>
+        <NotificationModal id="notifications" />
+      </Suspense>
       <TipJarModal id="tip-jar" />
       <DownloadModal id="download" />
       <KeyboardCommandsModal id="keyboard-commands" />

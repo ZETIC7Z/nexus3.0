@@ -42,6 +42,7 @@ import { usePreferencesStore } from "@/stores/preferences";
 import { ProgressMediaItem, useProgressStore } from "@/stores/progress";
 import { useSubtitleStore } from "@/stores/subtitles";
 import { WatchHistoryItem, useWatchHistoryStore } from "@/stores/watchHistory";
+import { detectDeviceLabel } from "@/utils/common/device";
 
 export interface RegistrationData {
   recaptchaToken?: string;
@@ -175,7 +176,8 @@ export function useMigration() {
           signature,
         },
         publicKey: bytesToBase64Url(keys.publicKey),
-        device: await encryptData(currentAccount.deviceName, keys.seed),
+        device: await encryptData(detectDeviceLabel(), keys.seed),
+        nickname: currentAccount.nickname,
         profile: currentAccount.profile,
       });
 

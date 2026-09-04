@@ -12,6 +12,7 @@ import { useIsIOS, useIsMobile, useIsPWA } from "@/hooks/useIsMobile";
 import { useIsTV } from "@/hooks/useIsTv";
 import { useRandomTranslation } from "@/hooks/useRandomTranslation";
 import { useSearchQuery } from "@/hooks/useSearchQuery";
+import { useUserDisplayName } from "@/hooks/useUserDisplayName";
 import { useBannerSize } from "@/stores/banner";
 
 import { GenreChips } from "./GenreChips";
@@ -71,8 +72,13 @@ export function HeroPart({
     ? navbarHeight + bannerSize + (isIOSPWA ? 34 : 0)
     : bannerSize + 14;
 
+  // Date/getHours() already reflect the visitor's own timezone, so the
+  // greeting bucket follows the user's country clock, not the server's.
   const time = getTimeOfDay(new Date());
-  const title = randomT(`home.titles.${time}`);
+  const displayName = useUserDisplayName();
+  const title = displayName
+    ? randomT(`home.greetings.${time}`).replaceAll("{{name}}", displayName)
+    : randomT(`home.titles.${time}`);
   const placeholder = randomT(`home.search.placeholder`);
   const inputRef = useRef<HTMLInputElement>(null);
   useSlashFocus(inputRef);

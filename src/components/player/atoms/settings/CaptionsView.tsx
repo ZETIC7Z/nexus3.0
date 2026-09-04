@@ -23,10 +23,8 @@ import { useLanguageStore } from "@/stores/language";
 import { CaptionListItem } from "@/stores/player/slices/source";
 import { usePlayerStore } from "@/stores/player/store";
 import { useSubtitleStore } from "@/stores/subtitles";
-import {
-  getPrettyLanguageNameFromLocale,
-  sortLangCodes,
-} from "@/utils/locale/language";
+import { sortLangCodes } from "@/utils/locale/language";
+import { getPrettyLanguageNameFromLocale } from "@/utils/locale/languageFull";
 
 import { useCaptionMatchScore } from "../../hooks/useCaptionMatchScore";
 

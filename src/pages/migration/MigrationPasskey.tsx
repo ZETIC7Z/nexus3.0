@@ -14,6 +14,7 @@ import {
   encryptData,
   storeCredentialMapping,
 } from "@/backend/accounts/crypto";
+import { detectDeviceLabel } from "@/utils/common/device";
 import { getLoginChallengeToken, loginAccount } from "@/backend/accounts/login";
 import { getRekeyChallengeToken, rekeyAccount } from "@/backend/accounts/rekey";
 import { getUser } from "@/backend/accounts/user";
@@ -55,7 +56,7 @@ export function MigrationPasskeyPage() {
     const result = await loginAccount(backendUrl, {
       challenge: { code: challenge, signature },
       publicKey: publicKeyBase64Url,
-      device: await encryptData("Passkey Recovery", keys.seed),
+      device: await encryptData(detectDeviceLabel(), keys.seed),
     });
 
     const user = await getUser(backendUrl, result.token);
@@ -99,7 +100,7 @@ export function MigrationPasskeyPage() {
       oldPublicKey,
       newPublicKey,
       challenge: { code: challenge, oldSignature, newSignature },
-      device: await encryptData("NEXUS Passkey", newKeys.seed),
+      device: await encryptData(detectDeviceLabel(), newKeys.seed),
     });
 
     storeCredentialMapping(backendUrl, newPublicKey, newCredId);
@@ -137,7 +138,7 @@ export function MigrationPasskeyPage() {
       oldPublicKey,
       newPublicKey,
       challenge: { code: challenge, oldSignature, newSignature },
-      device: await encryptData("NEXUS", newKeys.seed),
+      device: await encryptData(detectDeviceLabel(), newKeys.seed),
     });
 
     useAuthStore.getState().setAccount({

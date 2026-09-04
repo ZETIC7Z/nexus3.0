@@ -1,9 +1,7 @@
 import { useProgressStore } from "@/stores/progress";
 
 import { createVersionedStore } from "../migrations";
-import { OldData, migrateV2Videos } from "./migrations/v2";
-import { migrateV3Videos } from "./migrations/v3";
-import { migrateV4Videos } from "./migrations/v4";
+import type { OldData } from "./migrations/v2";
 import { WatchedStoreData } from "./types";
 
 export const VideoProgressStore = createVersionedStore<WatchedStoreData>()
@@ -19,18 +17,24 @@ export const VideoProgressStore = createVersionedStore<WatchedStoreData>()
   .addVersion({
     version: 1,
     async migrate(old: OldData) {
+      // Lazily imported: migration code drags in the whole TMDB/fuse
+      // metadata stack, which must not sit on the boot path. Only runs
+      // for ancient store versions anyway.
+      const { migrateV2Videos } = await import("./migrations/v2");
       return migrateV2Videos(old);
     },
   })
   .addVersion({
     version: 2,
-    migrate(old: WatchedStoreData) {
+    async migrate(old: WatchedStoreData) {
+      const { migrateV3Videos } = await import("./migrations/v3");
       return migrateV3Videos(old);
     },
   })
   .addVersion({
     version: 3,
-    migrate(old: WatchedStoreData): WatchedStoreData {
+    async migrate(old: WatchedStoreData): Promise<WatchedStoreData> {
+      const { migrateV4Videos } = await import("./migrations/v4");
       useProgressStore.getState().replaceItems(migrateV4Videos(old));
 
       return {

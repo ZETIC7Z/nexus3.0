@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { get } from "@/backend/metadata/tmdb";
-import { Icon, Icons } from "@/components/Icon";
 import { MediaItem } from "@/utils/media/mediaTypes";
+import { FlagIcon } from "@/components/FlagIcon";
 import { getCountryName } from "@/utils/locale/countryNames";
 import { detectUserRegion } from "@/utils/locale/userRegion";
 
@@ -145,7 +145,8 @@ export function CountryPicksCarousel({
   return (
     <section className="mb-10" aria-label={`Top 10 in ${countryName}`}>
       <div className="mb-4 flex items-center gap-2 px-4 md:px-10">
-        <Icon icon={Icons.GLOBE} className="text-base text-type-link" />
+        {/* Country flag of the detected region — same flag set as subtitles */}
+        <FlagIcon country={country.toLowerCase()} />
         <h2 className="text-xl font-bold text-white md:text-2xl">
           {t("discover.carousel.title.countryPicks", {
             country: countryName,

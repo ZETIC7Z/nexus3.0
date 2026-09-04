@@ -13,7 +13,7 @@ import { useOverlayRouter } from "@/hooks/useOverlayRouter";
 import { usePlayerStore } from "@/stores/player/store";
 import { qualityToString } from "@/stores/player/utils/qualities";
 import { useSubtitleStore } from "@/stores/subtitles";
-import { getPrettyLanguageNameFromLocale } from "@/utils/locale/language";
+import { getPrettyLanguageNameFromLocale } from "@/utils/locale/languageFull";
 import { getServerEmbedLabel } from "@/providers/embeds/shared";
 
 export function SettingsMenu({ id }: { id: string }) {

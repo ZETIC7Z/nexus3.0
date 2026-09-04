@@ -33,6 +33,7 @@ export interface RegisterInput {
     signature: string;
   };
   device: string;
+  nickname?: string;
   profile: {
     colorA: string;
     colorB: string;

@@ -16,6 +16,9 @@ import {
   getSourceName,
 } from "../utils";
 
+/** Notifications older than 30 days are auto-deleted from the list. */
+const NOTIFICATION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function NotificationModal({ id }: NotificationModalProps) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +165,17 @@ export function NotificationModal({ id }: NotificationModalProps) {
 
                     // Parse the publication date
                     const notificationDate = new Date(pubDate);
+
+                    // Auto-delete: notifications older than 30 days from
+                    // their posted date never reach the list at all.
+                    if (
+                      pubDate &&
+                      !Number.isNaN(notificationDate.getTime()) &&
+                      Date.now() - notificationDate.getTime() >
+                        NOTIFICATION_MAX_AGE_MS
+                    ) {
+                      return;
+                    }
 
                     allNotifications.push({
                       guid: itemGuid,

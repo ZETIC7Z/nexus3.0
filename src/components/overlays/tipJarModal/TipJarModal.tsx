@@ -8,33 +8,55 @@ interface TipAddress {
   name: string;
   network?: string;
   address: string;
- 
+  /** When present, the address row is a clickable external link. */
+  url?: string;
   pillClass: string;
 }
 
 const TIP_ADDRESSES: TipAddress[] = [
   {
-    symbol: "PayPal",
-    name: "PayPal",
-    address: "To be added...",
-    pillClass: "bg-blue-500/20 text-blue-300 border border-blue-500/30",
-  },
-  {
     symbol: "Wise",
     name: "Wise",
-    address: "To be added...",
+    network: "Send money",
+    address: "https://wise.com/pay/me/samfaussaidzahranp",
+    url: "https://wise.com/pay/me/samfaussaidzahranp",
     pillClass: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
   },
   {
+    symbol: "PayPal",
+    name: "PayPal",
+    network: "paypal.me/zeticuz",
+    address: "https://www.paypal.me/zeticuz",
+    url: "https://www.paypal.me/zeticuz",
+    pillClass: "bg-blue-500/20 text-blue-300 border border-blue-500/30",
+  },
+  {
     symbol: "GoTyme",
-    name: "Gotyme Bank",
-    address: "To be added...",
+    name: "GoTyme Bank (PH)",
+    network: "Account Name: Sam Pangilinan",
+    address: "017219868407",
     pillClass: "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30",
+  },
+  {
+    symbol: "GCash",
+    name: "GCash",
+    network: "Mobile number",
+    address: "09245422533",
+    pillClass: "bg-teal-500/20 text-teal-300 border border-teal-500/30",
+  },
+  {
+    symbol: "Stripe",
+    name: "Buy Me a Coffee",
+    network: "buymeacoffee.com/zeticuz",
+    address: "https://buymeacoffee.com/zeticuz",
+    url: "https://buymeacoffee.com/zeticuz",
+    pillClass: "bg-purple-500/20 text-purple-300 border border-purple-500/30",
   },
   {
     symbol: "Binance",
     name: "Binance",
-    address: "To be added...",
+    network: "ID",
+    address: "1172959541",
     pillClass: "bg-amber-500/20 text-amber-300 border border-amber-500/30",
   },
 ];
@@ -48,7 +70,6 @@ function AddressRow({ entry }: { entry: TipAddress }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
-     
       try {
         const ta = document.createElement("textarea");
         ta.value = entry.address;
@@ -59,7 +80,7 @@ function AddressRow({ entry }: { entry: TipAddress }) {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1500);
       } catch {
-      
+        // ignore
       }
     }
   }, [entry.address]);
@@ -93,14 +114,26 @@ function AddressRow({ entry }: { entry: TipAddress }) {
           <span>{copied ? "Copied" : "Copy"}</span>
         </button>
       </div>
-      <button
-        type="button"
-        onClick={onCopy}
-        className="block w-full text-left font-mono text-xs sm:text-sm text-type-secondary hover:text-white break-all bg-black/20 rounded-lg p-2.5 border border-white/5 hover:border-white/10 transition-colors"
-        title="Click to copy"
-      >
-        {entry.address}
-      </button>
+      {entry.url ? (
+        <a
+          href={entry.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full text-left font-mono text-xs sm:text-sm text-type-secondary hover:text-white break-all bg-black/20 rounded-lg p-2.5 border border-white/5 hover:border-white/10 transition-colors"
+          title="Click to open"
+        >
+          {entry.address}
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={onCopy}
+          className="block w-full text-left font-mono text-xs sm:text-sm text-type-secondary hover:text-white break-all bg-black/20 rounded-lg p-2.5 border border-white/5 hover:border-white/10 transition-colors"
+          title="Click to copy"
+        >
+          {entry.address}
+        </button>
+      )}
     </div>
   );
 }
@@ -110,9 +143,9 @@ export function TipJarModal({ id }: { id: string }) {
     <FancyModal id={id} title="Tip Jar" size="md">
       <div className="space-y-4">
         <p className="text-type-secondary text-base leading-relaxed">
-          nexus is free and %99 ad-free. If you'd like to support hosting + the
-          server bill, we would love your support on any amount to one of the addresses below. Tap an
-          address to copy it.
+          nexus is free and 99% ad-free. If you'd like to support hosting + the
+          server bill, we would love your support on any amount to one of the
+          channels below. Tap an address to copy it, or tap a link to open it.
         </p>
 
         <div className="space-y-3">

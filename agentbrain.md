@@ -158,3 +158,38 @@ Only then push + deploy.
    be cleared there.
 5. Downloads empty -> query the API directly (section 7), then check upstream slugs.
 6. Subtitles missing -> check `useCaptions` filters + vdrk availability.
+
+## MANDATORY per-change routine (never skip, user should never have to ask)
+
+Every time a feature, fix, or change lands in this repo — no matter how small:
+
+1. **Add an entry to `public/notifications.xml`** (new `<item>` at the top):
+   - unique `guid` with the date (`nexus-notif-YYYY-MM-DD-<slug>`),
+   - friendly title, plain-language description of what's new/changed/fixed,
+   - `pubDate` = now (PH time, `+0800`), bump `<lastBuildDate>` too,
+   - `<category>`: `update` | `feature` | `bugfix` | `announcement`.
+2. **Bump `V3_CHANGELOG_VERSION` in `src/utils/notifications.ts`** and update the
+   `announceV3Changelog()` bullets so signed-in users get the in-app changelog once.
+3. **Update `README.md`** (What's New section + changelog table with date/time).
+4. Only then commit/push/deploy. The user-visible notification is part of the
+   change itself, not an afterthought.
+5. Also remember the auto-delete rule already implemented: notifications older
+   than 30 days are pruned client-side (store prune + RSS filter). Old entries
+   in this file can be cleaned up when they expire.
+
+## Session-2026-09-04 late additions (context for future agents)
+
+- `src/components/popupShell/NoticePopup.tsx` + `src/stores/popupQueue`:
+  single-stage popup queue. ZliveNotice (maintenance, popup 1) then
+  UpdateNotice (app update, popup 2) share the top-center slot; each shows
+  once, auto-closes after 3.5 s (exit animation 280 ms), then the next claims
+  the stage. Never stack them.
+- Top 10 row (`CountryPicksCarousel.tsx`): uses `FlagIcon` with the detected
+  country code (lowercase) instead of the globe icon.
+- Greetings: `useUserDisplayName` hook decrypts the account nickname;
+  `HeroPart` picks `home.greetings.<time>` (with `{{name}}`) for signed-in
+  users, otherwise `home.titles.<time>`. Time bucket = user's local clock.
+- Boot-path budget: entry first-load JS must stay ≤ ~2.5 MB. Watch out for
+  the manualChunks Icon rule (exact path match only) and never statically
+  import `languageFull`, `subs.ts`, `utils/translation`, or migrations from
+  boot-path files — make them `await import()`.

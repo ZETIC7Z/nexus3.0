@@ -20,6 +20,7 @@ import { conf } from "@/setup/config";
 import { openWindowSafely } from "@/setup/popupGuard";
 import { useAuthStore } from "@/stores/auth";
 import { usePreferencesStore } from "@/stores/preferences";
+import { useTipJar } from "@/components/overlays/tipJarModal";
 
 function Divider() {
   return <hr className="border-0 w-full h-px bg-dropdown-border" />;
@@ -224,6 +225,7 @@ export function LinksDropdown(props: { children: React.ReactNode }) {
     [seed],
   );
   const { logout } = useAuth();
+  const { openTipJar } = useTipJar();
   const { openAuthModal } = useAuthModal();
   const backendUrl = useBackendUrl();
 
@@ -379,10 +381,19 @@ export function LinksDropdown(props: { children: React.ReactNode }) {
               icon={Icons.DISCORD}
             />
             <CircleDropdownLink href="/support" icon={Icons.SUPPORT} />
-            <CircleDropdownLink
-              href="https://rentry.co/m6f9fnu2"
-              icon={Icons.TIP_JAR}
-            />
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                openTipJar();
+              }}
+              aria-label="Tip Jar"
+              className="tabbable relative w-11 h-11 rounded-full bg-dropdown-contentBackground text-dropdown-text hover:text-white transition-colors duration-100 flex justify-center items-center overflow-hidden"
+            >
+              <div className="absolute inset-0 rounded-full bg-[linear-gradient(90deg,#a855f7,#ec4899,#d946ef,#c084fc,#a855f7,#ec4899,#d946ef,#c084fc,#a855f7)] bg-[length:300%_100%] opacity-60 animate-gradient-flow" />
+              <div className="absolute inset-[2px] rounded-full bg-dropdown-contentBackground" />
+              <Icon className="relative text-2xl" icon={Icons.TIP_JAR} />
+            </button>
           </div>
         </div>
       </Transition>

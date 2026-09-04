@@ -24,6 +24,7 @@ import { removeSession } from "@/backend/accounts/sessions";
 import { getSettings } from "@/backend/accounts/settings";
 import {
   UserResponse,
+  editUser,
   getBookmarks,
   getProgress,
   getUser,
@@ -43,6 +44,8 @@ export interface RegistrationData {
   credentialId?: string;
   userData: {
     device: string;
+    /** User-chosen nickname shown on the profile + greetings. */
+    nickname?: string;
     profile: {
       colorA: string;
       colorB: string;
@@ -198,6 +201,7 @@ export function useAuth() {
         },
         publicKey: publicKeyBase64Url,
         device: await encryptData(registerData.userData.device, keys.seed),
+        nickname: registerData.userData.nickname,
         profile: registerData.userData.profile,
       });
 
@@ -210,12 +214,30 @@ export function useAuth() {
         );
       }
 
-      return userDataLogin(
+      const account = await userDataLogin(
         registerResult,
         registerResult.user,
         registerResult.session,
         bytesToBase64(keys.seed),
       );
+
+      // Persist the chosen nickname to the backend so it survives across
+      // devices/logins even if the register endpoint ignores it. Best-effort:
+      // a failure here must not block the freshly-created account.
+      if (registerData.userData.nickname) {
+        try {
+          await editUser(backendUrl, account, {
+            nickname: registerData.userData.nickname,
+          });
+          useAuthStore.getState().setAccountNickname(
+            registerData.userData.nickname,
+          );
+        } catch {
+          // ignore — nickname already set locally
+        }
+      }
+
+      return account;
     },
     [backendUrl, userDataLogin],
   );

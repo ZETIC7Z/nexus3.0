@@ -3,8 +3,7 @@ import { BookmarkMediaItem, useBookmarkStore } from "@/stores/bookmarks";
 
 import { BookmarkStoreData } from "./types";
 import { createVersionedStore } from "../migrations";
-import { OldBookmarks, migrateV1Bookmarks } from "../watched/migrations/v2";
-import { migrateV2Bookmarks } from "../watched/migrations/v3";
+import type { OldBookmarks } from "../watched/migrations/v2";
 
 const typeMap: Record<MWMediaType, "show" | "movie" | null> = {
   [MWMediaType.ANIME]: null,
@@ -16,13 +15,16 @@ export const BookmarkStore = createVersionedStore<BookmarkStoreData>()
   .setKey("mw-bookmarks")
   .addVersion({
     version: 0,
-    migrate(oldBookmarks: OldBookmarks) {
+    async migrate(oldBookmarks: OldBookmarks) {
+      // Lazily imported (keeps TMDB/fuse off the boot path).
+      const { migrateV1Bookmarks } = await import("../watched/migrations/v2");
       return migrateV1Bookmarks(oldBookmarks);
     },
   })
   .addVersion({
     version: 1,
-    migrate(old: BookmarkStoreData) {
+    async migrate(old: BookmarkStoreData) {
+      const { migrateV2Bookmarks } = await import("../watched/migrations/v3");
       return migrateV2Bookmarks(old);
     },
   })

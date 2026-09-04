@@ -1,6 +1,7 @@
-import countryLanguages, { LanguageObj } from "@ladjs/country-language";
-import { getTag } from "@sozialhelden/ietf-language-tags";
-import { iso6393To1 } from "iso-639-3";
+// Light-weight language utilities that are safe to import on the boot path.
+// The heavy language database (@ladjs/country-language + ietf-language-tags,
+// ~1.1 MB) lives in ./languageFull and is only imported by settings UI —
+// nothing here may import it.
 
 const languageOrder = ["en", "hi", "fr", "de", "nl", "pt"];
 
@@ -9,11 +10,6 @@ const languageOrder = ["en", "hi", "fr", "de", "nl", "pt"];
 // This mapping purely exists to prioritize a country over another in languages where the base language code does
 // not contain a region (i.e. if the language code is zh-Hant where Hant is a script) or if the region in the language code is incorrect
 // iso639_1 -> iso3166 Alpha-2
-const countryPriority: Record<string, string> = {
-  zh: "cn",
-  nv: "us",
-};
-
 // list of iso639_1 Alpha-2 codes used as default languages
 const defaultLanguageCodes: string[] = [
   "ar-SA",
@@ -93,7 +89,11 @@ const extraLanguages: Record<string, LocaleInfo> = {
   },
 };
 
-function populateLanguageCode(language: string): string {
+// Languages written right-to-left. This fixed set replaces the old
+// country-language database lookup for the boot path (direction only).
+const rtlLanguageCodes = ["ar", "he", "fa", "ur", "ps", "sd", "ug", "yi"];
+
+export function populateLanguageCode(language: string): string {
   if (language.includes("-")) return language;
   if (language.length !== 2) return language;
   return (
@@ -102,22 +102,22 @@ function populateLanguageCode(language: string): string {
 }
 
 /**
- * @param locale idk what kinda code this takes, anything in ietf format I guess
- * @returns pretty format for language, null if it no info can be found for language
+ * Boot-safe locale info without any language database. Code resolution uses
+ * the same default-region mapping as before; display names for the standard
+ * languages are resolved by the heavy variant in languageFull (settings UI).
+ * @param locale locale code in ietf-ish format
+ * @returns minimal locale info
  */
-export function getPrettyLanguageNameFromLocale(locale: string): string | null {
-  const tag =
-    locale.length === 3
-      ? getTag(iso6393To1[locale] ?? locale, true)
-      : getTag(locale, true);
-  const lang = tag?.language?.Description?.[0] ?? null;
-  if (!lang) return null;
-
-  const region = tag?.region?.Description?.[0] ?? null;
-  let regionText = "";
-  if (region) regionText = ` (${region})`;
-
-  return `${lang}${regionText}`;
+export function getLightLocaleInfo(locale: string): LocaleInfo {
+  const realLocale = populateLanguageCode(locale);
+  const extraLang = extraLanguages[locale] ?? extraLanguages[realLocale];
+  if (extraLang) return { ...extraLang };
+  const base = realLocale.split("-")[0];
+  return {
+    code: realLocale,
+    isRtl: rtlLanguageCodes.includes(base),
+    name: locale,
+  };
 }
 
 /**
@@ -146,93 +146,6 @@ export function sortLangCodes(langCodes: string[], appLanguage?: string) {
   });
 
   return results;
-}
-
-/**
- * Get country code for locale
- * @param locale input locale
- * @returns country code or null
- */
-export function getCountryCodeForLocale(locale: string): string | null {
-  let output: LanguageObj | null = null as any as LanguageObj;
-  const tag = getTag(populateLanguageCode(locale), true);
-
-  if (!tag?.language?.Subtag) return null;
-  // this function isn't async, so its guaranteed to work like this
-  countryLanguages.getLanguage(tag.language.Subtag, (_err, lang) => {
-    if (lang) output = lang;
-  });
-
-  if (!output) return null;
-  const iso = output.iso639_1?.toLowerCase();
-  const priority = iso ? countryPriority[iso] : undefined;
-  if (output.countries.length === 0) {
-    return priority ?? null;
-  }
-
-  if (priority) {
-    const prioritizedCountry = output.countries.find(
-      (v) => v.code_2?.toLowerCase() === priority,
-    );
-    if (prioritizedCountry?.code_2)
-      return prioritizedCountry.code_2.toLowerCase();
-  }
-
-  // If the language contains a region, check that against the countries and
-  // return the region if it matches
-  const regionSubtag = tag?.region?.Subtag?.toLowerCase();
-  if (regionSubtag) {
-    const regionCode = output.countries.find(
-      (c) =>
-        c.code_2?.toLowerCase() === regionSubtag ||
-        c.code_3?.toLowerCase() === regionSubtag,
-    );
-    if (regionCode?.code_2) return regionCode.code_2.toLowerCase();
-  }
-
-  const firstWithCode = output.countries.find((c) => !!c.code_2);
-  return firstWithCode?.code_2 ? firstWithCode.code_2.toLowerCase() : null;
-}
-
-/**
- * Get information for a specific local
- * @param locale local code
- * @returns locale object
- */
-export function getLocaleInfo(locale: string): LocaleInfo | null {
-  const realLocale = populateLanguageCode(locale);
-
-  document.body.style.wordSpacing = "normal";
-
-  const extraLang = extraLanguages[realLocale];
-  if (extraLang) {
-    if (extraLang.code === "futhark") {
-      document.body.style.wordSpacing = "5px";
-    }
-    return extraLang;
-  }
-
-  const tag = getTag(realLocale, true);
-  if (!tag?.language?.Subtag) return null;
-
-  let output: LanguageObj | null = null as any as LanguageObj;
-  // this function isnt async, so its garuanteed to work like this
-  countryLanguages.getLanguage(tag.language.Subtag, (_err, lang) => {
-    if (lang) output = lang;
-  });
-  if (!output) return null;
-
-  const extras = [];
-  if (tag.region?.Description) extras.push(tag.region.Description[0]);
-  if (tag.script?.Description) extras.push(tag.script.Description[0]);
-  const extraStringified = extras.map((v) => `(${v})`).join(" ");
-
-  return {
-    code: tag.parts.langtag ?? realLocale,
-    isRtl: output.direction === "RTL",
-    name: output.name[0] + (extraStringified ? ` ${extraStringified}` : ""),
-    nativeName: output.nativeName[0] ?? undefined,
-  };
 }
 
 /**

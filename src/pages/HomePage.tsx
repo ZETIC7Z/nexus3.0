@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -17,7 +17,6 @@ import { BookmarksGrid } from "@/pages/parts/home/BookmarksGrid";
 import { HeroPart } from "@/pages/parts/home/HeroPart";
 import { WatchingCarousel } from "@/pages/parts/home/WatchingCarousel";
 import { WatchingGrid } from "@/pages/parts/home/WatchingGrid";
-import { SearchListPart } from "@/pages/parts/search/SearchListPart";
 import { SearchLoadingPart } from "@/pages/parts/search/SearchLoadingPart";
 import { conf } from "@/setup/config";
 import { useOverlayStack } from "@/stores/interface/overlayStack";
@@ -29,6 +28,10 @@ import { AdsPart } from "./parts/home/AdsPart";
 import { HomeAd } from "./parts/home/HomeAd";
 import { SupportBar } from "./parts/home/SupportBar";
 import { ZliveNotice } from "./parts/home/ZliveNotice";
+
+const SearchListPart = lazy(() =>
+  import("@/pages/parts/search/SearchListPart").then((m) => ({ default: m.SearchListPart })),
+);
 
 function useSearch(search: string) {
   const [searching, setSearching] = useState<boolean>(false);
@@ -219,10 +222,12 @@ export function HomePage() {
             <SearchLoadingPart />
           ) : (
             s.searching && (
-              <SearchListPart
-                searchQuery={search}
-                onShowDetails={handleShowDetails}
-              />
+              <Suspense fallback={<SearchLoadingPart />}>
+                <SearchListPart
+                  searchQuery={search}
+                  onShowDetails={handleShowDetails}
+                />
+              </Suspense>
             )
           )}
         </WideContainer>
