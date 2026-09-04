@@ -216,6 +216,7 @@ function entries(url, headers, ctrl) {
 // title starts loading; re-opening the menu (or switching sources) then
 // hits the warm cache instead of re-scraping every provider.
 const CACHE_TTL_MS = 60_000;
+const EMPTY_RESULT_TTL_MS = 5_000;
 const responseCache = new Map();
 
 async function mainHandler(req, res) {
@@ -333,7 +334,12 @@ async function mainHandler(req, res) {
       downloads,
       subtitles,
     };
-    responseCache.set(cacheKey, { at: Date.now(), payload });
+        // Never let a transient upstream miss (HF cold start, network
+        // blip) poison the cache: empty results are only remembered for
+        // a few seconds, so the next preload retries quickly.
+        const isEmptyResult = downloads.length === 0 && subtitles.length === 0;
+        const ttl = isEmptyResult ? EMPTY_RESULT_TTL_MS : CACHE_TTL_MS;
+        responseCache.set(cacheKey, { at: Date.now() - (CACHE_TTL_MS - ttl), payload });
     res.status(200).json(payload);
   } catch (e) {
     res.status(500).json({ success: false, error: e?.message || "internal" });
