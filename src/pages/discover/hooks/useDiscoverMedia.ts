@@ -217,7 +217,7 @@ export function useDiscoverMedia({
               type: mediaType === "movie" ? "movie" : "show",
             };
           } catch (err) {
-            console.error(`Error fetching details for TMDB ID ${tmdbId}:`, err);
+            console.debug(`TMDB ID ${tmdbId} details unavailable`, (err as Error).message);
             return null; // Return null for failed items
           }
         });
@@ -238,7 +238,7 @@ export function useDiscoverMedia({
           hasMore: hasMoreResults,
         };
       } catch (err) {
-        console.error("Error fetching Trakt media:", err);
+        console.debug("Trakt media unavailable:", (err as Error).message);
         throw err;
       }
     },
@@ -501,7 +501,7 @@ export function useDiscoverMedia({
       });
       setHasMore(data.hasMore);
     } catch (err) {
-      console.error("Error fetching media:", err);
+      console.debug("Media fetch failed:", (err as Error).message);
       setError((err as Error).message);
 
       // Try fallback content type if available
@@ -519,7 +519,7 @@ export function useDiscoverMedia({
           setHasMore(fallbackData.hasMore);
           setError(null); // Clear error if fallback succeeds
         } catch (fallbackErr) {
-          console.error("Error fetching fallback media:", fallbackErr);
+          console.debug("Fallback media fetch failed:", (fallbackErr as Error).message);
           setError((fallbackErr as Error).message);
         }
       }
