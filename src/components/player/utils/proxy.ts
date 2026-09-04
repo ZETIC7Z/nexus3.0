@@ -1,65 +1,146 @@
 import { getLoadbalancedM3U8ProxyUrl } from "@/backend/providers/fetchers";
 import { getM3U8ProxyUrls } from "@/utils/hosting/proxyUrls";
+import {
+  isOriginDead,
+  markOriginNetworkDead,
+  markOriginTimeout,
+  markOriginHealthy,
+} from "@/utils/common/originHealth";
+
+function normalizedBaseUrl(url: string): string {
+  return url.replace(/\/$/, "");
+}
+
+function getEnabledProxyUrls(): string[] {
+  const configured = getM3U8ProxyUrls().map(normalizedBaseUrl).filter(Boolean);
+  if (typeof localStorage === "undefined") return configured;
+
+  const enabledProxies = localStorage.getItem("m3u8-proxy-enabled");
+  if (!enabledProxies) return configured;
+
+  try {
+    const enabled = JSON.parse(enabledProxies) as Record<string, boolean>;
+    return configured
+      .filter((_url, index) => enabled[index.toString()] !== false)
+      .filter((url) => !isProxyOriginDead(url));
+  } catch {
+    return configured.filter((url) => !isProxyOriginDead(url));
+  }
+}
 
 /**
- * Creates a proxied M3U8 URL for HLS streams using a random proxy from config
- * @param url - The original M3U8 URL to proxy
- * @param headers - Headers to include with the request
- * @returns The proxied M3U8 URL
+ * A proxy origin remembered as dead (CORS/DNS refused from this device,
+ * see originHealth) is skipped everywhere proxies are picked. Probes and
+ * playback report outcomes so the memory stays accurate.
+ */
+export function isProxyOriginDead(url: string): boolean {
+  return isOriginDead(url);
+}
+
+export function reportProxyFailure(url: string, kind: "network" | "timeout") {
+  if (kind === "network") markOriginNetworkDead(url);
+  else markOriginTimeout(url);
+}
+
+export function reportProxySuccess(url: string) {
+  markOriginHealthy(url);
+}
+
+function buildM3U8ProxyUrl(
+  proxyBaseUrl: string,
+  url: string,
+  headers: Record<string, string>,
+): string {
+  const params = new URLSearchParams({
+    url,
+  });
+  if (Object.keys(headers).length > 0) {
+    params.set("headers", JSON.stringify(headers));
+  }
+  return `${normalizedBaseUrl(proxyBaseUrl)}/m3u8-proxy?${params.toString()}`;
+}
+
+/**
+ * Creates a proxied M3U8 URL using the configured P-Stream/simple-proxy
+ * service. The proxy rewrites variant playlists and segment URLs, so the
+ * browser never has to make cross-origin HLS requests to the CDN.
  */
 export function createM3U8ProxyUrl(
   url: string,
   headers: Record<string, string> = {},
 ): string {
-  // Get a random M3U8 proxy URL from the configuration
-  const proxyBaseUrl = getLoadbalancedM3U8ProxyUrl();
+  if (!url || isUrlAlreadyProxied(url)) return url;
 
+  let proxyBaseUrl: string | null = getLoadbalancedM3U8ProxyUrl();
+  if (proxyBaseUrl && isProxyOriginDead(proxyBaseUrl)) {
+    // Previously-failed proxy - transparently fall back to a healthy one.
+    proxyBaseUrl =
+      getEnabledProxyUrls().find((base) => !isProxyOriginDead(base)) ?? null;
+  }
   if (!proxyBaseUrl) {
-    console.warn("No M3U8 proxy URLs available in configuration");
-    return url; // Fallback to original URL
+    // Fires per stream otherwise - a stale-config setup would spam the
+    // console once per candidate URL. Warn a single time instead.
+    if (!(window as any).__nexusWarnedNoM3U8Proxy) {
+      (window as any).__nexusWarnedNoM3U8Proxy = true;
+      console.warn("No M3U8 proxy URLs available in configuration");
+    }
+    return url;
   }
 
-  const encodedUrl = encodeURIComponent(url);
-  const headerPart = Object.keys(headers).length > 0
-    ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
-    : "";
-  return `${proxyBaseUrl}/m3u8-proxy?url=${encodedUrl}${headerPart}`;
+  return buildM3U8ProxyUrl(proxyBaseUrl, url, headers);
 }
 
 /**
- * TODO: Creates a proxied MP4 URL for MP4 streams
- * @param url - The original MP4 URL to proxy
- * @param headers - Headers to include with the request
- * @returns The proxied MP4 URL
+ * Return every enabled configured proxy in stable order. The currently
+ * load-balanced proxy is tried first, followed by the remaining proxies.
+ */
+export function createM3U8ProxyUrls(
+  url: string,
+  headers: Record<string, string> = {},
+): string[] {
+  if (!url) return [];
+  if (isUrlAlreadyProxied(url)) return [url];
+
+  const configured = getEnabledProxyUrls();
+  const selected = getLoadbalancedM3U8ProxyUrl();
+  const ordered = selected
+    ? [normalizedBaseUrl(selected), ...configured]
+    : configured;
+  const uniqueBases = [
+    ...new Set(ordered.filter((base) => !isProxyOriginDead(base))),
+  ];
+
+  return uniqueBases.map((base) => buildM3U8ProxyUrl(base, url, headers));
+}
+
+/**
+ * TODO: Creates a proxied MP4 URL for MP4 streams.
+ * MP4 playback normally works through a regular URL; header-dependent files
+ * use the application's same-origin stream proxy instead.
  */
 export function createMP4ProxyUrl(
   url: string,
   _headers: Record<string, string> = {},
 ): string {
-  // TODO: Implement MP4 proxy for protected streams
-  // This would need a separate MP4 proxy service that can handle headers
-  // For now, return the original URL
-  console.warn("MP4 proxy not yet implemented - using original URL");
   return url;
 }
 
 /**
- * Checks if a URL is already using one of the configured M3U8 proxy services
- * @param url - The URL to check
- * @returns True if the URL is already proxied, false otherwise
+ * Checks whether a URL is already routed through a known HLS proxy.
  */
 export function isUrlAlreadyProxied(url: string): boolean {
-  // Check if URL contains the m3u8-proxy pattern (Airplay format)
-  if (url.includes("/m3u8-proxy?url=")) {
+  if (!url) return false;
+
+  if (
+    url.includes("/m3u8-proxy?url=") ||
+    url.includes("/ts-proxy?url=") ||
+    url.includes("/?destination=")
+  ) {
     return true;
   }
 
-  // Check if URL contains the destination pattern (Chromecast format)
-  if (url.includes("/?destination=")) {
-    return true;
-  }
-
-  // Also check if URL starts with any of the configured proxy URLs
-  const proxyUrls = getM3U8ProxyUrls();
-  return proxyUrls.some((proxyUrl) => url.startsWith(proxyUrl));
+  const proxyUrls = getM3U8ProxyUrls().map(normalizedBaseUrl);
+  return proxyUrls.some(
+    (proxyUrl) => url === proxyUrl || url.startsWith(`${proxyUrl}/`),
+  );
 }

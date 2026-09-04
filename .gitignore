@@ -33,3 +33,6 @@ sync-fork.bat
 .vercel
 .env*
 .freebuff/
+
+# dev server logs
+.dev-server*.log

@@ -172,7 +172,7 @@ export function SourceSelectPart(props: { media: ScrapeMedia }) {
 
   useEffect(() => {
     let active = true;
-    getLiveNexusProviders()
+    getLiveNexusProviders(props.media)
       .then((p) => {
         if (!active) return;
         setLive(p);
@@ -184,7 +184,7 @@ export function SourceSelectPart(props: { media: ScrapeMedia }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [props.media]);
 
   const sources = useMemo(() => {
     const metaType = props.media.type;

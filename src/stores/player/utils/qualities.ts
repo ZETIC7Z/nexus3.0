@@ -9,7 +9,20 @@ export type StreamType = "hls" | "mp4";
 export type SourceFileStream = {
   type: "mp4";
   url: string;
+  headers?: Stream["headers"];
+  preferredHeaders?: Stream["preferredHeaders"];
 };
+
+export interface SourceAudioTrack {
+  id: string;
+  label: string;
+  language: string;
+  url: string;
+  type?: StreamType;
+  default?: boolean;
+  headers?: Stream["headers"];
+  preferredHeaders?: Stream["preferredHeaders"];
+}
 
 export type LoadableSource = {
   type: StreamType;
@@ -24,12 +37,14 @@ export type SourceSliceSource =
       qualities: Partial<Record<SourceQuality, SourceFileStream>>;
       headers?: Stream["headers"];
       preferredHeaders?: Stream["preferredHeaders"];
+      audioTracks?: SourceAudioTrack[];
     }
   | {
       type: "hls";
       url: string;
       headers?: Stream["headers"];
       preferredHeaders?: Stream["preferredHeaders"];
+      audioTracks?: SourceAudioTrack[];
     };
 
 const qualitySorting: Record<SourceQuality, number> = {
@@ -83,6 +98,13 @@ export function getPreferredQuality(
   return nearestChoseQuality;
 }
 
+function mergeHeaders(
+  ...headerSets: Array<Record<string, string> | undefined>
+): Record<string, string> | undefined {
+  const merged = Object.assign({}, ...headerSets.filter(Boolean));
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
 export function selectQuality(
   source: SourceSliceSource,
   qualityPreferences: QualityStore["quality"],
@@ -116,7 +138,17 @@ export function selectQuality(
     if (quality) {
       const stream = source.qualities[quality];
       if (stream) {
-        return { stream, quality };
+        return {
+          stream: {
+            ...stream,
+            headers: mergeHeaders(source.headers, stream.headers),
+            preferredHeaders: mergeHeaders(
+              source.preferredHeaders,
+              stream.preferredHeaders,
+            ),
+          },
+          quality,
+        };
       }
     }
   }

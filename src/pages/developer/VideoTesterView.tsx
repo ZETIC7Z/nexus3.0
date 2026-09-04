@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
-  EMBED_API_BASE,
-  fetchAndRankEmbed,
+  buildAudioTracksForProvider,
+  buildProviderEndpoint,
+  collectCaptionsForStreams,
+  fetchEmbedApi,
+  fetchProviderResponse,
+  headersForItem,
   isHlsItem,
+  normalizeProviderId,
+  providerIdForItem,
+  rankStreams,
+  type EmbedMediaRequest,
   type RankedStream,
 } from "@/providers/embeds";
 import { prepareStream } from "@/backend/extension/streams";
@@ -20,7 +28,11 @@ import { Divider } from "@/components/utils/Divider";
 import { PlaybackErrorPart } from "@/pages/parts/player/PlaybackErrorPart";
 import { PlayerPart } from "@/pages/parts/player/PlayerPart";
 import { PlayerMeta, playerStatus } from "@/stores/player/slices/source";
-import { SourceSliceSource, StreamType } from "@/stores/player/utils/qualities";
+import {
+  SourceQuality,
+  SourceSliceSource,
+  StreamType,
+} from "@/stores/player/utils/qualities";
 import { type ExtensionStatus, getExtensionState } from "@/utils/browser/extension";
 
 const testMeta: PlayerMeta = {
@@ -43,16 +55,68 @@ const streamTypes: Record<StreamType, string> = {
 
 // TMDB-Embed provider list for the dev tester (mirrors src/providers/embeds)
 const DEV_EMBED_PROVIDERS = [
-  { id: "vidlink", name: "VidLink 🎬" },
-  { id: "notorrent", name: "NoTorrent 🧲" },
   { id: "videasy", name: "Videasy 🎥" },
+  { id: "vaplayer", name: "VaPlayer ▶️" },
+  { id: "netmirror", name: "NetMirror 🔴" },
+  { id: "vidlink", name: "VidLink 🎬" },
+  { id: "castletv", name: "CastleTV 🏰" },
   { id: "vixsrc", name: "VixSrc 🔗" },
-  { id: "vidcore", name: "VidCore 💎" },
-  { id: "vidup", name: "VidUp ⬆️" },
-  { id: "vidfast", name: "VidFast ⚡" },
+  { id: "onetouchtv", name: "OneTouchTV 📺" },
+  { id: "showbox", name: "ShowBox 📦" },
+  { id: "zxcstreams", name: "ZXCStreams ⚡" },
   { id: "anikoto", name: "AniKoto 👺" },
   { id: "anikai", name: "AniKai 🥷" },
+  { id: "yamie", name: "Yamie ❤️" },
 ];
+
+type TesterStartOptions = {
+  headers?: Record<string, string>;
+  captions?: any[];
+  audioTracks?: any[];
+  fileStreams?: RankedStream[];
+  sourceId?: string | null;
+  meta?: PlayerMeta;
+};
+
+function testerMeta(
+  tmdbId: string,
+  isSeries: boolean,
+  season: string,
+  episode: string,
+): PlayerMeta {
+  if (!isSeries) {
+    return {
+      ...testMeta,
+      tmdbId,
+      title: `TMDB ${tmdbId}`,
+    };
+  }
+
+  const seasonNumber = Number(season) || 1;
+  const episodeNumber = Number(episode) || 1;
+  return {
+    ...testMeta,
+    tmdbId,
+    title: `TMDB ${tmdbId}`,
+    type: "show",
+    season: {
+      number: seasonNumber,
+      tmdbId: `${tmdbId}-season-${seasonNumber}`,
+      title: `Season ${seasonNumber}`,
+    },
+    episode: {
+      number: episodeNumber,
+      tmdbId: `${tmdbId}-episode-${seasonNumber}-${episodeNumber}`,
+      title: `Episode ${episodeNumber}`,
+    },
+  };
+}
+
+function providerHintFromEndpoint(endpoint: string): string | undefined {
+  const match = endpoint.match(/\/api\/streams\/([^/]+)\/(?:movie|series)\//i);
+  if (!match?.[1]) return undefined;
+  return normalizeProviderId(decodeURIComponent(match[1])) ?? undefined;
+}
 
 export default function VideoTesterView() {
   const { status, playMedia, setMeta, reset } = usePlayer();
@@ -72,9 +136,7 @@ export default function VideoTesterView() {
   const [embedSeason, setEmbedSeason] = useState("1");
   const [embedEpisode, setEmbedEpisode] = useState("1");
   const [embedRawUrl, setEmbedRawUrl] = useState("");
-  const [embedResults, setEmbedResults] = useState<
-    Array<{ name: string; quality: string; latency: number | null; url: string; hls: boolean }>
-  >([]);
+  const [embedResults, setEmbedResults] = useState<RankedStream[]>([]);
   const [embedLoading, setEmbedLoading] = useState(false);
   const [embedError, setEmbedError] = useState<string | null>(null);
 
@@ -111,35 +173,64 @@ export default function VideoTesterView() {
     }
   }, [headersEnabled]);
 
-  // Build the TMDB-Embed API endpoint for the current tester inputs.
-  const buildEmbedEndpoint = useCallback((): string => {
-    const type = embedIsSeries ? "series" : "movie";
-    let url = `${EMBED_API_BASE}/api/streams/${embedProvider}/${type}/${encodeURIComponent(embedTmdbId)}`;
-    if (embedIsSeries) {
-      url += `?season=${encodeURIComponent(embedSeason)}&episode=${encodeURIComponent(embedEpisode)}`;
+  // Build the TMDB-Embed API request for the current tester inputs.
+  const buildEmbedMedia = useCallback((): EmbedMediaRequest => {
+    if (!embedIsSeries) {
+      return { tmdbId: embedTmdbId, type: "movie" };
     }
-    return url;
-  }, [embedProvider, embedTmdbId, embedIsSeries, embedSeason, embedEpisode]);
+    return {
+      tmdbId: embedTmdbId,
+      type: "show",
+      season: { number: Number(embedSeason) || 1 },
+      episode: { number: Number(embedEpisode) || 1 },
+    };
+  }, [embedTmdbId, embedIsSeries, embedSeason, embedEpisode]);
 
-  // Fetch + rank every server for the current endpoint.
+  // Build the dedicated endpoint shown in the tester.
+  const buildEmbedEndpoint = useCallback((): string => {
+    const media = buildEmbedMedia();
+    return buildProviderEndpoint(embedProvider, media);
+  }, [buildEmbedMedia, embedProvider]);
+
+  const fetchEmbedResponse = useCallback(
+    async (endpoint?: string) => {
+      const rawTarget = endpoint?.trim() || embedRawUrl.trim();
+      if (rawTarget) {
+        const response = await fetchEmbedApi(rawTarget);
+        return {
+          response,
+          providerHint:
+            normalizeProviderId(response.provider) ??
+            providerHintFromEndpoint(rawTarget),
+        };
+      }
+
+      const response = await fetchProviderResponse(embedProvider, buildEmbedMedia());
+      return { response, providerHint: embedProvider };
+    },
+    [embedRawUrl, embedProvider, buildEmbedMedia],
+  );
+
+  const rankEmbedResponse = useCallback(
+    async (endpoint?: string): Promise<RankedStream[]> => {
+      const { response, providerHint } = await fetchEmbedResponse(endpoint);
+      const ranked = await rankStreams(response.streams ?? [], providerHint);
+      if (ranked.length === 0) {
+        throw new Error("No browser-playable streams found");
+      }
+      return ranked;
+    },
+    [fetchEmbedResponse],
+  );
+
+  // Fetch + rank every stream for the current endpoint.
   const fetchEmbedList = useCallback(
     async (endpoint?: string) => {
-      const target = endpoint || embedRawUrl || buildEmbedEndpoint();
-      if (!target) return;
       setEmbedLoading(true);
       setEmbedError(null);
       try {
-        const ranked: RankedStream[] = await fetchAndRankEmbed(target);
-        setEmbedResults(
-          ranked.map((r) => ({
-            name:
-              r.item.name || r.item.server || r.item.title || r.item.provider || "Stream",
-            quality: r.quality,
-            latency: r.latency,
-            url: r.item.url,
-            hls: isHlsItem(r.item),
-          })),
-        );
+        const ranked = await rankEmbedResponse(endpoint);
+        setEmbedResults(ranked);
       } catch (err) {
         setEmbedError(err instanceof Error ? err.message : "Fetch failed");
         setEmbedResults([]);
@@ -147,22 +238,23 @@ export default function VideoTesterView() {
         setEmbedLoading(false);
       }
     },
-    [embedRawUrl, buildEmbedEndpoint],
+    [rankEmbedResponse],
   );
 
-
-
   const start = useCallback(
-    async (url: string, type: StreamType) => {
-      // Build headers object from enabled headers
-      const headersObj: Record<string, string> = {};
-      if (headersEnabled) {
-        headers.forEach(({ key, value }) => {
-          if (key.trim() && value.trim()) {
-            headersObj[key.trim()] = value.trim();
-          }
-        });
-      }
+    async (url: string, type: StreamType, options: TesterStartOptions = {}) => {
+      // Build headers object from enabled headers for custom streams. Provider
+      // playback passes its own headers explicitly and must not inherit these.
+      const headersObj = options.headers ?? (() => {
+        const configured: Record<string, string> = {};
+        if (headersEnabled) {
+          headers.forEach(({ key, value }) => {
+            if (key.trim() && value.trim()) configured[key.trim()] = value.trim();
+          });
+        }
+        return configured;
+      })();
+      const audioTracks = options.audioTracks ?? [];
 
       let source: SourceSliceSource;
       if (type === "hls") {
@@ -170,70 +262,146 @@ export default function VideoTesterView() {
           type: "hls",
           url,
           ...(Object.keys(headersObj).length > 0 && { headers: headersObj }),
+          ...(Object.keys(headersObj).length > 0 && { preferredHeaders: headersObj }),
+          ...(audioTracks.length > 0 && { audioTracks }),
         };
       } else if (type === "mp4") {
+        const qualities: Partial<
+          Record<
+            SourceQuality,
+            {
+              type: "mp4";
+              url: string;
+              headers?: Record<string, string>;
+              preferredHeaders?: Record<string, string>;
+            }
+          >
+        > = {};
+        for (const stream of options.fileStreams ?? []) {
+          if (isHlsItem(stream.item) || qualities[stream.quality as SourceQuality]) continue;
+          qualities[stream.quality as SourceQuality] = {
+            type: "mp4",
+            url: stream.playUrl,
+            headers: headersForItem(stream.item),
+            preferredHeaders: headersForItem(stream.item),
+          };
+        }
+        if (Object.keys(qualities).length === 0) {
+          qualities.unknown = { type: "mp4", url };
+        }
         source = {
           type: "file",
-          qualities: {
-            unknown: {
-              type: "mp4",
-              url,
-            },
-          },
+          qualities,
           ...(Object.keys(headersObj).length > 0 && { headers: headersObj }),
+          ...(Object.keys(headersObj).length > 0 && { preferredHeaders: headersObj }),
+          ...(audioTracks.length > 0 && { audioTracks }),
         };
       } else throw new Error("Invalid type");
 
-      // Prepare stream headers if extension is active and headers are present
+      const providerStream: any = {
+        type: type === "hls" ? "hls" : "file",
+        ...(type === "hls"
+          ? { playlist: url }
+          : { qualities: source.type === "file" ? source.qualities : {} }),
+        captions: options.captions ?? [],
+        flags: [],
+        skipValidation: true,
+        ...(Object.keys(headersObj).length > 0 && { headers: headersObj }),
+        ...(Object.keys(headersObj).length > 0 && { preferredHeaders: headersObj }),
+      };
+
       if (extensionState === "success" && Object.keys(headersObj).length > 0) {
-        // Create a mock Stream object for prepareStream
-        const mockStream: any = {
-          type: type === "hls" ? "hls" : "file",
-          ...(type === "hls"
-            ? { playlist: url }
-            : {
-                qualities: {
-                  unknown: {
-                    type: "mp4",
-                    url,
-                  },
-                },
-              }),
-          headers: headersObj,
-        };
         try {
-          await prepareStream(mockStream);
+          await prepareStream(providerStream);
         } catch (error) {
           console.warn("Failed to prepare stream headers:", error);
         }
       }
 
-      setMeta(testMeta);
-      playMedia(source, [], null);
+      setMeta(options.meta ?? testMeta);
+      const captions = options.captions
+        ? convertProviderCaption(options.captions)
+        : [];
+      playMedia(
+        source,
+        captions,
+        options.sourceId ?? null,
+        undefined,
+        audioTracks,
+      );
     },
     [playMedia, setMeta, headersEnabled, headers, extensionState],
   );
 
-  // Play the best (first ranked) stream directly in the player.
+  const playRankedEmbed = useCallback(
+    async (selectedStream: RankedStream, allStreams: RankedStream[] = embedResults) => {
+      if (selectedStream.latency === null) {
+        setEmbedError("This stream failed validation and cannot be played");
+        return;
+      }
+
+      const usable = allStreams.filter((stream) => stream.latency !== null);
+      const providerId =
+        providerIdForItem(selectedStream.item) ??
+        normalizeProviderId(embedProvider) ??
+        "embed";
+      const captions = collectCaptionsForStreams(
+        usable,
+        `nexus-tester-${providerId}`,
+      );
+      const audioTracks = buildAudioTracksForProvider(
+        providerId,
+        usable,
+        selectedStream,
+      );
+
+      await start(
+        selectedStream.playUrl,
+        isHlsItem(selectedStream.item) ? "hls" : "mp4",
+        {
+          headers: headersForItem(selectedStream.item),
+          captions,
+          audioTracks,
+          fileStreams: usable,
+          sourceId: `nexus-${providerId}`,
+          meta: testerMeta(
+            embedTmdbId,
+            embedIsSeries,
+            embedSeason,
+            embedEpisode,
+          ),
+        },
+      );
+    },
+    [
+      embedResults,
+      embedProvider,
+      embedTmdbId,
+      embedIsSeries,
+      embedSeason,
+      embedEpisode,
+      start,
+    ],
+  );
+
+  // Play the best validated stream directly in the player.
   const playBestEmbed = useCallback(async () => {
-    const target = embedRawUrl || buildEmbedEndpoint();
-    if (!target) return;
     setEmbedLoading(true);
     setEmbedError(null);
     try {
-      const ranked = await fetchAndRankEmbed(target);
-      const best = ranked.find((r) => r.latency !== null) ?? ranked[0];
+      const ranked = await rankEmbedResponse();
+      setEmbedResults(ranked);
+      const best = ranked.find((stream) => stream.latency !== null);
       if (!best) {
-        setEmbedError("No playable stream found");
-        return;
+        throw new Error("No validated playable stream found");
       }
-      await start(best.item.url, isHlsItem(best.item) ? "hls" : "mp4");
+      await playRankedEmbed(best, ranked);
     } catch (err) {
       setEmbedError(err instanceof Error ? err.message : "Fetch failed");
     } finally {
       setEmbedLoading(false);
     }
-  }, [embedRawUrl, buildEmbedEndpoint, start]);
+  }, [rankEmbedResponse, playRankedEmbed]);
 
   const startFromCli = useCallback(async () => {
     try {
@@ -273,6 +441,10 @@ export default function VideoTesterView() {
           type: "hls",
           url: streamData.playlist,
           ...(streamData.headers && { headers: streamData.headers }),
+          ...(streamData.preferredHeaders && {
+            preferredHeaders: streamData.preferredHeaders,
+          }),
+          ...(streamData.audioTracks && { audioTracks: streamData.audioTracks }),
         };
       } else if (streamData.type === "file") {
         // Handle file type streams
@@ -285,6 +457,10 @@ export default function VideoTesterView() {
           type: "file",
           qualities,
           ...(streamData.headers && { headers: streamData.headers }),
+          ...(streamData.preferredHeaders && {
+            preferredHeaders: streamData.preferredHeaders,
+          }),
+          ...(streamData.audioTracks && { audioTracks: streamData.audioTracks }),
         };
       } else {
         throw new Error(`Unsupported stream type: ${streamData.type}`);
@@ -298,8 +474,8 @@ export default function VideoTesterView() {
       // Prepare stream headers if extension is active and headers are present
       if (
         extensionState === "success" &&
-        streamData.headers &&
-        Object.keys(streamData.headers).length > 0
+        (Object.keys(streamData.headers ?? {}).length > 0 ||
+          Object.keys(streamData.preferredHeaders ?? {}).length > 0)
       ) {
         try {
           await prepareStream(streamData);
@@ -542,19 +718,22 @@ export default function VideoTesterView() {
                   {embedResults.map((r, i) => (
                     // eslint-disable-next-line react/no-array-index-key
                     <div
-                      key={`${r.url}-${i}`}
+                      key={`${r.playUrl}-${i}`}
                       className="flex items-center justify-between gap-3 bg-video-context-flagBg rounded-md px-3 py-2"
                     >
                       <div className="min-w-0">
-                        <p className="text-white text-sm truncate">{r.name}</p>
+                        <p className="text-white text-sm truncate">
+                          {r.item.name || r.item.server || r.item.title || r.item.provider || "Stream"}
+                        </p>
                         <p className="text-xs text-type-secondary">
-                          {r.quality} · {r.hls ? "HLS" : "MP4"} ·{" "}
+                          {r.quality} · {isHlsItem(r.item) ? "HLS" : "MP4"} ·{" "}
                           {r.latency !== null ? `${r.latency}ms` : "no response"}
                         </p>
                       </div>
                       <Button
                         theme={r.latency !== null ? "purple" : "secondary"}
-                        onClick={() => start(r.url, r.hls ? "hls" : "mp4")}
+                        disabled={r.latency === null}
+                        onClick={() => playRankedEmbed(r)}
                       >
                         Play
                       </Button>

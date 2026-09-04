@@ -5,15 +5,8 @@ import {
 } from "@nexus/providers";
 
 import { isExtensionActiveCached } from "@/backend/extension/messaging";
-import {
-  makeExtensionFetcher,
-  makeLoadBalancedSimpleProxyFetcher,
-  setupM3U8Proxy,
-} from "@/backend/providers/fetchers";
+import { makeExtensionFetcher } from "@/backend/providers/fetchers";
 import { nexusCustomProviders, nexusCustomEmbeds } from "@/providers/nexus-providers-index";
-
-// Initialize M3U8 proxy on module load
-setupM3U8Proxy();
 
 function isDesktopApp(): boolean {
   return Boolean(typeof window !== "undefined" && window.__NEXUS_DESKTOP__);
@@ -36,15 +29,15 @@ export function getProviders() {
       .setTarget(targets.BROWSER_EXTENSION)
       .enableConsistentIpForRequests();
   } else {
-    setupM3U8Proxy();
+    // The new HF provider returns browser-ready URLs. Keep the normal fetcher
+    // available to provider code, but do not install a destination proxy.
     builder
       .setFetcher(makeStandardFetcher(fetch))
-      .setProxiedFetcher(makeLoadBalancedSimpleProxyFetcher())
-      .setTarget(targets.BROWSER_EXTENSION)
+      .setProxiedFetcher(makeStandardFetcher(fetch))
+      .setTarget(targets.BROWSER)
       .enableConsistentIpForRequests();
   }
 
-  builder.addBuiltinProviders();
 
   // Add NEXUS custom providers & embeds
   for (const provider of nexusCustomProviders) {
@@ -60,9 +53,9 @@ export function getProviders() {
 export function getAllProviders() {
   const builder = buildProviders()
     .setFetcher(makeStandardFetcher(fetch))
-    .setTarget(targets.BROWSER_EXTENSION)
-    .enableConsistentIpForRequests()
-    .addBuiltinProviders();
+    .setProxiedFetcher(makeStandardFetcher(fetch))
+    .setTarget(targets.BROWSER)
+    .enableConsistentIpForRequests();
 
   // Add NEXUS custom providers & embeds
   for (const provider of nexusCustomProviders) {

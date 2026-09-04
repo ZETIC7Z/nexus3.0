@@ -19,13 +19,16 @@ function getMetricsBackendUrl(): string | null {
     : config.BACKEND_URL;
 }
 
-function getMetricsEndpoint(path: string): string | null {
+function _getMetricsEndpoint(path: string): string | null {
   const backendUrl = getMetricsBackendUrl();
   return backendUrl ? `${backendUrl}${path}` : null;
 }
 
-const metricsEndpoint = getMetricsEndpoint("/metrics/providers");
-const captchaMetricsEndpoint = getMetricsEndpoint("/metrics/captcha");
+// Metrics disabled: our backend does not expose /metrics endpoints, so each
+// scrape would fire failing POSTs (404 noise in dev tools). The report calls
+// below early-return when these are null, behavior is otherwise unchanged.
+const metricsEndpoint: string | null = null;
+const captchaMetricsEndpoint: string | null = null;
 const batchId = () => nanoid(32);
 
 export type ProviderMetric = {

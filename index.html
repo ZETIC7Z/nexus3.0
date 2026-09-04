@@ -124,6 +124,13 @@
 }
 </script>
 {{/if}}
+
+<!-- Preconnects: warm the hosts the first paint talks to (faster TTFB) -->
+<link rel="preconnect" href="https://api.themoviedb.org" crossorigin />
+<link rel="preconnect" href="https://image.tmdb.org" crossorigin />
+<link rel="preconnect" href="https://stycanine1-tmdb-embed-api.hf.space" crossorigin />
+<link rel="dns-prefetch" href="https://media.vidrift.in" />
+
 </head>
 <body>
 <noscript>

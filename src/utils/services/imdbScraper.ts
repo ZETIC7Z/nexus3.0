@@ -112,13 +112,19 @@ export async function scrapeIMDb(
 
   if (!hasExtension && !hasProxy) {
     // Custom API for trailers:
-    const trailerResponse = await fetch(
-      `https://fed-trailers.nexus.mov/${type === "movie" ? "movie" : "tv"}/${imdbId}`,
-    ).then((res) => res.json());
-    if (trailerResponse.trailer?.embed_url) {
-      return {
-        trailer_url: trailerResponse.trailer.embed_url,
-      };
+    // Quiet failure: this endpoint may be unreachable/CORS-blocked;
+    // trailer metadata is optional enrichment, never worth console noise.
+    try {
+      const trailerResponse = await fetch(
+        `https://fed-trailers.nexus.mov/${type === "movie" ? "movie" : "tv"}/${imdbId}`,
+      ).then((res) => res.json());
+      if (trailerResponse.trailer?.embed_url) {
+        return {
+          trailer_url: trailerResponse.trailer.embed_url,
+        };
+      }
+    } catch {
+      // Ignore and continue to the extension/proxy requirement below.
     }
     // END CUSTOM API
     throw new Error(
@@ -127,9 +133,7 @@ export async function scrapeIMDb(
     );
   }
 
-  console.log(
-    `[IMDb Scraper] Using ${hasExtension ? "browser extension" : "custom proxy"} for requests`,
-  );
+  // Status log removed to keep the console clean during playback.
 
   // Get user language if not provided
   if (!language) {

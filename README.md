@@ -11,6 +11,30 @@
 
 ---
 
+## 🚀 What's New — Sep 4, 2026
+
+### Yamie Provider (movies)
+New movie-only source backed by a direct HLS endpoint (`media.vidrift.in/movie_{tmdbId}/vod.m3u8`). It is built client-side from the TMDB id — no backend round-trip — and is probed before being offered, so it only appears when it is actually online. TV shows never see it.
+
+### Downloads That Load Before You Click
+The moment a title starts playing (or even while the source spinner is still running), the app preloads `/api/downloads` in the background. Opening **Download Movie** or **Download Subtitle** is then instant:
+- **MKV only** — MP4 clutter removed; original provider URLs untouched (e.g. `https://p.111477.xyz/bulk?u=...mkv`)
+- **Alive only** — every MKV is liveness-probed server-side; certainly-dead links (404/410/DNS) never reach the menu. Hosts that block datacenter IPs (403) stay listed because they work for real users
+- **Subtitles preloaded too** — grouped by language, ready immediately
+
+### Mobile & Device Smoothness
+- Device-aware HLS buffering: phones/tablets use a short memory-friendly buffer, desktops keep the deep seek-anywhere buffer
+- `capLevelToPlayerSize` + a lower starting bandwidth estimate on mobile — no more 4K autoplay on cell data
+- Preconnects to TMDB + the stream API warm the first paint
+
+### Reliability
+- Dead proxy/CDN origins are remembered per device (localStorage) and skipped automatically — no repeated CORS errors, faster stream start
+- Auto-subtitles skip CORS-dead hosts and fall back to a working track
+- Server-side MKV liveness cache (10/30 min TTL) makes repeat download-menu opens instant
+- VidLink + VixSrc temporarily hidden (upstream 403) — code kept, one flag re-enables
+
+---
+
 ## 🚀 v3.0 — What's New
 
 ### Flattened Provider Architecture
@@ -39,16 +63,20 @@ Polls GitHub releases every 6 hours. When a new version drops, you get an in-app
 
 ### Sources (tried in rank order — highest first)
 
-| Source | Rank | Backend | Type |
-|--------|------|---------|------|
-| **Zephyr** | 1330 | CF Worker + vidfast.vc encryption | Movies, TV |
-| **NoTorrent** | 970 | Stremio addon aggregator (up to 11 mirrors) | Movies, TV |
-| **VidCore** | 960 | Supreme/Prime servers via moon CDN | Movies, TV |
-| **Videasy** | 950 | — | Movies, TV |
-| **VidUp** | 940 | Moon CDN | Movies, TV |
-| **VidFast** | 930 | — | Movies, TV |
-| **AniKoto** | 900 | Dub support (multi-language audio tracks) | Anime |
-| **AniKai** | 890 | Sub streams | Anime |
+| Source | Rank | Type | Notes |
+|--------|------|------|-------|
+| **AniKoto** | 1020 | Anime | Dub support (multi-language audio) |
+| **AniKai** | 1015 | Anime | Sub streams |
+| **Videasy** | 1010 | Movies, TV | |
+| **VaPlayer** | 1000 | Movies, TV | |
+| **NetMirror** | 990 | Movies, TV | |
+| **CastleTV** | 970 | Movies, TV | |
+| **OneTouchTV** | 950 | Movies, TV | |
+| **ShowBox** | 940 | Movies, TV | |
+| **ZXCStreams** | 930 | Movies, TV | |
+| **Yamie ❤️** | 920 | **Movies only** | Direct `media.vidrift.in` HLS, built from TMDB id |
+
+**Hidden (code intact, one flag re-enables):** VidLink + VixSrc (upstream 403), StreamFlix, 4KHDHub, DahmerMovies (download-only — MKV sources in the Download menu).
 
 ### How Providers Work
 
@@ -103,7 +131,7 @@ git clone https://github.com/ZETIC7Z/nexus3.0.git
 cd nexus3.0
 pnpm install
 cp example.env .env
-# → Fill in VITE_TMDB_READ_API_KEY in .env
+# → Fill in TMDB_READ_API_KEY in .env
 pnpm run dev
 # → http://localhost:5173
 ```
@@ -119,7 +147,7 @@ pnpm run dev
 
 | Variable | Value |
 |----------|-------|
-| `VITE_TMDB_READ_API_KEY` | Your TMDB v4 read token |
+| `TMDB_READ_API_KEY` | Your TMDB v4 read token (server-side, used by `api/tmdb.js`) |
 | `VITE_TMDB_EMBED_URL` | `https://stycanine1-tmdb-embed-api.hf.space` |
 | `VITE_APP_DOMAIN` | Your Vercel domain |
 | `VITE_NORMAL_ROUTER` | `true` |
@@ -132,37 +160,68 @@ pnpm run dev
 
 ## How to Add a New Provider
 
-### Adding a TMDB-Embed Provider
+There are two shapes of provider. Pick the one that matches your upstream.
 
-1. **Verify** the provider exists:
+---
+
+### Recipe A — TMDB-Embed provider (aggregate API)
+
+Use this when the HF aggregate API already serves the provider.
+
+1. **Verify upstream first** (always before writing code):
    ```bash
-   curl "https://stycanine1-tmdb-embed-api.hf.space/api/streams/{PROVIDER}/movie/603"
+   curl "https://stycanine1-tmdb-embed-api.hf.space/api/streams/PROVIDER/movie/603"
    ```
+   Expect `success: true` + a `streams` array. No data → stop here.
 
-2. **Create** the provider file in `src/providers/embeds/{provider}/{provider}-provider.ts`:
+2. **Add one line to the catalog** in `src/providers/embeds/shared.ts`:
    ```ts
-   import { makeEmbedProvider } from "../shared";
+   export const NEXUS_PROVIDER_CATALOG: NexusProviderDef[] = [
+     ...
+     { id: "newprovider", name: "NewProvider", playable: true, rank: 905 },
+     ...
+   ];
+   ```
+   - `rank` decides try-order (higher = tried first; range 800–1100).
+   - Anime providers add `anime: true`.
+   - To hide without deleting code: `playable: false, rank: 0` (exactly how VidLink/VixSrc are parked).
 
-   export const newProvider = makeEmbedProvider({
-     id: "nexus-embed-newprovider",
-     name: "NewProvider",
-     rank: 920,
-     backend: "newprovider",
-     anime: false,
-   });
+3. **That's it.** `makeEmbedProvider` (same file) auto-generates the provider: API fetching, latency probing with content validation, quality ranking, subtitle passthrough, dub audio tracks for anime. The file-per-provider folders (`embeds/<name>/<name>-provider.ts`) were removed — everything is catalog-driven now.
+
+---
+
+### Recipe B — Direct endpoint provider (the Yamie way)
+
+Use this for a provider that serves streams from its own predictable URL pattern (no aggregate API).
+
+Yamie (movies only): `https://media.vidrift.in/movie_{tmdbId}/vod.m3u8`
+
+1. **Define the URL builder** in `src/providers/embeds/shared.ts`:
+   ```ts
+   const YAMIE_PROVIDER_ID = "yamie";
+   const YAMIE_STREAM_BASE = "https://media.vidrift.in";
+
+   export function buildYamieStreamUrl(tmdbId: string): string {
+     return `${YAMIE_STREAM_BASE}/movie_${encodeURIComponent(tmdbId)}/vod.m3u8`;
+   }
    ```
 
-3. **Register** in `src/providers/nexus-providers-index.ts`:
-   - Add `makeStandaloneSource(...)` for a flattened source (or use `makeEmbedProvider` for sub-embeds)
-   - Add to `nexusCustomProviders` array
+2. **Register it movie-only** in `NEXUS_PROVIDER_CATALOG`:
+   ```ts
+   { id: "yamie", name: "Yamie ❤️", playable: true, moviesOnly: true, rank: 920 },
+   ```
+   `moviesOnly: true` sets `mediaTypes: ["movie"]` on the provider, which removes it from TV show allow-lists automatically.
 
-4. The provider automatically gets:
-   - API fetching (`buildEmbedUrl` generates the endpoint)
-   - Latency probing with content-aware validation
-   - Quality ranking (4K → 1080 → 720 → 480 → 360)
-   - Best-server selection
-   - Subtitle passthrough
-   - Audio tracks with flags (anime: Japanese + dubs)
+3. **Handle it in the scrape path** (`makeEmbedProvider`'s scrape, same file): when `providerId === "yamie"` and the media is a **movie**, return a single item built from `buildYamieStreamUrl(media.tmdbId)` and skip the aggregate API. For TV, return `[]` as a third safety net. The standard probe pipeline then validates the m3u8 — if the file is missing, Yamie is silently absent that session.
+
+4. **Add it to the download API** if it has files worth downloading: `api/downloads.js` → `ALL_PROVIDERS` (and a timeout in `PROVIDER_TIMEOUT_MS` if it's slow).
+
+5. **Test** with the dev video tester (Developer → Video Tester, provider dropdown) and by playing a movie + an episode.
+
+**Rules that keep providers healthy:**
+- Never ship a provider that fails `playable` probing — probe-first is why the app stays clean.
+- Hide, don't delete: `playable: false, rank: 0` parks a provider with zero code churn.
+- Keep per-provider timeouts modest in `api/downloads.js` so one slow backend can't stall the whole downloads payload.
 
 ### Troubleshooting
 
@@ -174,7 +233,7 @@ curl "https://stycanine1-tmdb-embed-api.hf.space/api/streams/vidcore/movie/603"
 curl -I "https://..."
 ```
 
-If all streams dead → set `disabled: true` or remove from array.
+If all streams dead → set `playable: false` in the catalog.
 If only some servers dead → the content-aware probe filters them automatically.
 
 ---
@@ -203,50 +262,51 @@ If only some servers dead → the content-aware probe filters them automatically
 ```
 src/
 ├── providers/
-│   ├── nexus-providers-index.ts   ← Registry: all 8 sources
-│   ├── allowed-providers.ts       ← Anime filtering (AniKoto/AniKai hidden for movies)
+│   ├── nexus-providers-index.ts   ← Registry: all sources (catalog-driven)
+│   ├── allowed-providers.ts       ← Show/movie allow-lists (movie-only filtered)
 │   ├── provider-health.ts         ← Health probes
 │   ├── shared/
-│   │   ├── makeProviderContext.ts ← Provider factory (stream: undefined on empty)
+│   │   ├── makeProviderContext.ts ← Provider factory (mediaTypes, empty-stream guard)
 │   │   └── types.ts
-│   ├── zephyr/
-│   │   └── provider.ts            ← Zephyr (CF Worker encryption)
 │   └── embeds/
-│       ├── shared.ts              ← API fetch, latency probe, quality, dubs, flags
-│       ├── notorrent/
-│       ├── vidcore/
-│       ├── videasy/
-│       ├── vidup/
-│       ├── vidfast/
-│       ├── anikoto/               ← Anime with dub support
-│       └── anikai/                ← Anime sub-only
-├── pages/
-│   ├── Kids.tsx                   ← Kids mode page
-│   ├── ProfileSelect.tsx          ← Profile picker
-│   ├── Apps.tsx                   ← Apps page
-│   └── discover/
-│       └── components/
-│           └── CountryPicksCarousel.tsx  ← Top 10 in your country
-├── stores/
-│   ├── profiles/                  ← Multi-profile state
-│   ├── ads/                       ← Ad state
-│   └── subtitles/                 ← Enabled: true, language: en by default
-├── components/
-│   ├── AvatarPicker.tsx           ← Avatar selection
-│   └── ConflixAvatar.tsx          ← Conflix-style avatar component
-└── utils/
-    ├── player/
-    │   └── audioTracks.ts         ← Audio track store + switchAudioTrack
-    ├── locale/
-    │   ├── detectRegion.tsx        ← Proxy region (ipapi.co)
-    │   ├── userRegion.ts          ← User country (navigator/timezone)
-    │   └── countryNames.ts        ← Country code → name map
-    └── notifications.ts           ← Update checker + toast notifications
+│       └── shared.ts              ← NEXUS_PROVIDER_CATALOG + makeEmbedProvider:
+│                                    API fetch, latency probe, quality ranking,
+│                                    Yamie direct endpoint, dub/flag audio tracks
+├── components/player/
+│   ├── display/base.ts            ← hls.js config (device-aware buffering)
+│   ├── utils/proxy.ts             ← M3U8 proxy selection + dead-origin memory
+│   ├── atoms/settings/Downloads.tsx ← Download Movie / Subtitle views
+│   └── hooks/useCaptions.ts       ← Caption auto-select w/ failure memory
+├── utils/
+│   ├── downloadPreload.ts         ← Warms /api/downloads on Play Now
+│   ├── common/originHealth.ts     ← localStorage dead-origin memory
+│   └── notifications.ts           ← Update checker + toast notifications
+└── stores/player/slices/source.ts ← Source selection + subtitle fallback chain
+
+api/
+├── tmdb.js                        ← TMDB metadata proxy (server-side key)
+├── downloads.js                   ← MKV/subtitle aggregation + liveness cache
+└── stream-proxy.js                ← Same-origin HLS/MP4/sub download proxy
+
+plugins/                           ← Vite dev-server shims for the api/ functions
 ```
 
 ---
 
 ## Changelog
+
+### Sep 4, 2026
+- **Yamie provider** — movie-only direct HLS source (`media.vidrift.in`), probe-gated
+- **Preloaded downloads** — MKV/subtitle lists load with playback, menu opens instantly
+- **MKV-only downloads** — original provider URLs, liveness-checked, dead links dropped
+- **Server-side liveness cache** (10/30 min TTL) + 60s response cache on `/api/downloads`
+- **Mobile smoothness** — device-aware HLS buffers, `capLevelToPlayerSize`, lower mobile ABR start, preconnects
+- **Dead-origin memory** — failed proxy hosts remembered per device and skipped
+- **Cleaner console** — metrics 404s, IMDb enrichment errors, subtitle retry storms silenced
+- **Env cleanup** — removed unused `VITE_MOVIEBOX_API_URL` / `VITE_VIDSRC_API_URL` + dead Vercel rewrite
+- **Docs** — provider recipes (aggregate + direct-endpoint), agent guide added
+
+
 
 ### v3.0 (Aug 2026)
 - **Flattened providers** — 8 individual sources, no Embeds wrapper

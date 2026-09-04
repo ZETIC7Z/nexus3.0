@@ -4,8 +4,40 @@
     <title>NEXUS Notifications</title>
     <description>Site updates, feature announcements, and important alerts for NEXUS users</description>
     <language>en</language>
-    <lastBuildDate>Thu, 06 Aug 2026 17:14:00 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 04 Sep 2026 13:30:00 +0800</lastBuildDate>
+    
     <item>
+      <guid>nexus-notif-2026-09-04-yamie-downloads-mobile</guid>
+      <title>⚡ Yamie Provider, Instant Downloads &amp; Mobile Smoothness Update</title>
+      <description>A big round of speed and reliability improvements, released today (Sep 4, 2026):
+
+**New Provider — Yamie 🍠**
+• Brand-new provider for MOVIES: direct high-speed HLS stream, no middleman
+• Yamie only appears when watching movies (TV series keep their usual sources) and only when it is actually online — zero dead ends
+
+**Downloads, ready before you even click**
+• MKV download links now load together with the stream the moment you press Play — opening Download Movie or Download Subtitle is instant
+• Only MKV files are listed (no MP4 clutter), served as the original untouched provider URLs
+• Every MKV is liveness-checked and dead links are removed; blocked-from-server links stay because they usually work on your device
+• Subtitle files are preloaded too — grouped by language and ready immediately
+
+**Mobile &amp; device smoothness**
+• Player now adapts to your device: phones and tablets get memory-friendly buffering that plays smoothly on mobile data, desktops keep the deep seek-anywhere buffer
+• Smaller data footprint on mobile (no more 4K autoplay on cell networks; capped to your screen size)
+• Faster first load everywhere thanks to preconnected API hosts
+
+**Reliability &amp; cleanup**
+• Dead proxy servers are remembered and skipped automatically — fewer stalls, faster stream start, cleaner console
+• Failed subtitle hosts are skipped and a working language track is picked automatically
+• Removed two obsolete settings entries; provider sources unchanged and fully working
+
+Thank you for streaming with NEXUS! 🍿
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Fri, 04 Sep 2026 13:30:00 +0800</pubDate>
+      <category>update</category>
+    </item>
+<item>
       <guid>nexus-notif-2026-08-06-v30-embeds-kids-country</guid>
       <title>🎉 NEXUS 3.0 — Providers Overhaul, Kids Profile, Country Top 10 &amp; More!</title>
       <description>We are thrilled to announce the biggest NEXUS update yet, released today (Aug 6, 2026):

@@ -49,7 +49,9 @@ export async function scrapeOpenSubtitlesCaptions(
 
     return openSubtitlesCaptions;
   } catch (error) {
-    console.error("Error fetching OpenSubtitles:", error);
+    // Quiet failure: OpenSubtitles is often CORS-blocked or rate limited.
+    // The caller already handles an empty list gracefully.
+    void error;
     return [];
   }
 }

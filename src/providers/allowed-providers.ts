@@ -1,24 +1,14 @@
 // allowed-providers.ts
 // NEXUS — Per-Media Allowed Provider Registry
 // ---------------------------------------------------------------------------
-// Movie/TV sources: Zephyr, NoTorrent, VidCore, Videasy, VidUp, VidFast
-// Anime sources:     Zephyr, AniKoto, AniKai
+// Playback sources come from the TMDB-Embed HF backend. Every playable
+// provider covers movies + TV; anime-specific backends (AniKoto, AniKai)
+// join the list when the title is anime.
 // ---------------------------------------------------------------------------
 
-const MOVIE_TV_SOURCES = [
-  "nexus-vidfast2",
-  "nexus-notorrent",
-  "nexus-vidcore",
-  "nexus-videasy",
-  "nexus-vidup",
-  "nexus-vidfast",
-];
+import { PLAYABLE_PROVIDERS } from "./embeds/shared";
 
-const ANIME_SOURCES = [
-  "nexus-vidfast2",
-  "nexus-anikoto",
-  "nexus-anikai",
-];
+const ANIME_IDS = new Set(["anikoto", "anikai"]);
 
 export function isAnimeByTitle(title?: string, _tmdbId?: string): boolean {
   if (!title) return false;
@@ -62,5 +52,15 @@ export function getAllowedSourceIds(
   _mediaType: "movie" | "show",
   isAnime: boolean,
 ): string[] {
-  return isAnime ? ANIME_SOURCES : MOVIE_TV_SOURCES;
+  const ids = PLAYABLE_PROVIDERS.map((p) => `nexus-${p.id}`);
+  const general = ids.filter(
+    (id) =>
+      !ANIME_IDS.has(id.replace("nexus-", "")) &&
+      // Movie-only providers (Yamie) are never allowed for shows.
+      !(_mediaType === "show" && PLAYABLE_PROVIDERS.find((p) => `nexus-${p.id}` === id)?.moviesOnly),
+  );
+  if (!isAnime) return general;
+  // Anime titles: anime backends first, then the general ones.
+  const animeFirst = ids.filter((id) => ANIME_IDS.has(id.replace("nexus-", "")));
+  return [...animeFirst, ...general];
 }

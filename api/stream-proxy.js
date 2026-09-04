@@ -1,16 +1,18 @@
-// api/vidfast2-stream.js
-// Vercel serverless function — transparent proxy for VidFast2 HLS/TS playback.
+// api/stream-proxy.js
+// Vercel serverless function — neutral same-origin media proxy used by ALL
+// NEXUS providers (TMDB-Embed backends return raw CDN URLs that require
+// per-stream Referer/User-Agent headers and often have no CORS headers).
 // - Rewrites RELATIVE URLs inside HLS playlists so hls.js resolves them
-//   against the upstream CDN (moon.ironwallnet.net), not the proxy URL.
-//   Without this, variant/segment lines like "sd/14/index-s1080p-v1-a1.m3u8"
-//   are resolved against /api/vidfast2-stream/... and fail with 400.
-// - Passes binary segments (.ts / .m4s / subtitles) through untouched.
-// - Keeps the required Referer/Origin/User-Agent headers on every hop.
+//   against the proxy, keeping every hop same-origin and header-correct.
+// - Passes binary segments (.ts / .m4s / mp4 ranges) through byte-for-byte
+//   with correct Content-Length (required by Safari/iOS media stack).
+// - Injects per-stream headers (Referer / User-Agent / Origin) from the
+//   provider API on every hop.
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
 
-const ALLOWED_PATHS = new Set(["m3u8-proxy", "ts-proxy"]);
+const ALLOWED_PATHS = new Set(["m3u8-proxy", "ts-proxy", "sub-proxy", "dl"]);
 
 // SSRF guard: VidFast2's CDN rotates hosts per stream (moon.ironwallnet.net,
 // housestrong.site, ...), so a fixed allowlist would break playback. Instead
@@ -71,7 +73,7 @@ function isAllowedMediaUrl(value) {
 function makeProxyUrl(url, kind, queryHeaders) {
   const params = new URLSearchParams({ sp: kind, url });
   if (queryHeaders) params.set("headers", queryHeaders);
-  return `/api/vidfast2-stream?${params.toString()}`;
+  return `/api/stream-proxy?${params.toString()}`;
 }
 
 function rewriteUriAttribute(line, baseUrl, queryHeaders) {
@@ -119,15 +121,16 @@ function rewritePlaylist(text, baseUrl, queryHeaders) {
 }
 
 export default async function handler(req, res) {
-  // Accept: path-style (/m3u8-proxy?url=...), Vercel rewrite (?sp=m3u8-proxy), legacy (?path=m3u8-proxy).
+  // Accept: path-style (/m3u8-proxy?url=...), Vercel rewrite (?sp=), app style (?kind=), legacy (?path=).
   let rawPath = "";
+  if (req.query?.kind) rawPath = Array.isArray(req.query.kind) ? req.query.kind[0] : req.query.kind;
   // Vercel rewrite uses ?sp= to avoid query param conflicts
-  if (req.query?.sp) rawPath = Array.isArray(req.query.sp) ? req.query.sp[0] : req.query.sp;
+  if (!rawPath && req.query?.sp) rawPath = Array.isArray(req.query.sp) ? req.query.sp[0] : req.query.sp;
   // Legacy ?path= style
   if (!rawPath && req.query?.path) rawPath = Array.isArray(req.query.path) ? req.query.path[0] : req.query.path;
-  // Path-style: /api/vidfast2-stream/m3u8-proxy?url=...
+  // Path-style: /api/stream-proxy/m3u8-proxy?url=...
   if (!rawPath) {
-    rawPath = (req.url || "").replace(/^.*?\/api\/vidfast2-stream\/?/, "").replace(/\?.*$/, "");
+    rawPath = (req.url || "").replace(/^.*?\/api\/stream-proxy\/?/, "").replace(/\?.*$/, "");
   }
   const path = rawPath.replace(/^\/+|\/+$/g, "");
   if (!ALLOWED_PATHS.has(path)) {
@@ -151,6 +154,9 @@ export default async function handler(req, res) {
     Accept: "*/*",
     "User-Agent": BROWSER_UA,
   };
+  // Forward the player's Range header so MP4/byte-range seeking works.
+  const clientRange = req.headers?.range;
+  if (clientRange) headers.Range = clientRange;
   if (queryHeaders) {
     try {
       Object.assign(headers, JSON.parse(queryHeaders));
@@ -158,12 +164,12 @@ export default async function handler(req, res) {
       /* ignore malformed headers param */
     }
   }
-  // Fallback Referer: use the CDN URL's origin (works for most providers).
+  // Fallback Referer: use the CDN URL's own origin (works for most providers).
   if (!headers.Referer && !headers.Referrer) {
     try {
       headers.Referer = new URL(streamUrl).origin + "/";
     } catch {
-      headers.Referer = "https://vidfast.vc/";
+      headers.Referer = "";
     }
   }
 
@@ -191,21 +197,45 @@ export default async function handler(req, res) {
     const ct = upstream.headers.get("content-type") || "";
     if (ct) res.setHeader("Content-Type", ct);
     res.setHeader("Access-Control-Allow-Origin", "*");
+    // Byte-range pass-through (206 responses must keep these for seeking).
+    const cr = upstream.headers.get("content-range");
+    if (cr) res.setHeader("Content-Range", cr);
+    const ar = upstream.headers.get("accept-ranges");
+    if (ar) res.setHeader("Accept-Ranges", ar);
     if (method === "HEAD") {
+      const cl = upstream.headers.get("content-length");
+      if (cl) res.setHeader("Content-Length", cl);
       res.send("");
       return;
     }
 
+    // Downloads: force attachment so browsers save the file.
+    if (path === "dl") {
+      const dlBuf = Buffer.from(await upstream.arrayBuffer());
+      res.setHeader("Content-Length", String(dlBuf.length));
+      res.setHeader("Content-Disposition", 'attachment; filename="nexus-download"');
+      res.send(dlBuf);
+      return;
+    }
+
+    // Subtitles pass through raw (no playlist rewriting).
+    if (path === "sub-proxy") {
+      const subBuf = Buffer.from(await upstream.arrayBuffer());
+      res.setHeader("Content-Length", String(subBuf.length));
+      res.send(subBuf);
+      return;
+    }
+
     const buf = Buffer.from(await upstream.arrayBuffer());
-    const body = buf.toString("utf8");
 
     // HLS playlists get relative URLs rewritten; everything else (segments,
-    // subtitles, MP4) passes through byte-for-byte.
+    // MP4 ranges) passes through byte-for-byte with explicit Content-Length.
     const isPlaylist =
-      ct.includes("mpegurl") || /^#EXTM3U/.test(body.trim());
+      ct.includes("mpegurl") || /^#EXTM3U/.test(buf.toString("utf8", 0, 64).trim());
     if (isPlaylist) {
-      res.send(rewritePlaylist(body, streamUrl, queryHeaders));
+      res.send(rewritePlaylist(buf.toString("utf8"), currentUrl, queryHeaders));
     } else {
+      res.setHeader("Content-Length", String(buf.length));
       res.send(buf);
     }
   } catch (e) {

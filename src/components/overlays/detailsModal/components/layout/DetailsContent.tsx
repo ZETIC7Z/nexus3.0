@@ -211,7 +211,7 @@ export function DetailsContent({ data, minimal = false }: DetailsContentProps) {
           setRtData(rtMetadata);
         }
       } catch (error) {
-        console.error("Failed to fetch external data:", error);
+        // External IMDb/RT enrichment is optional: fail silently.
       } finally {
         setIsLoadingImdb(false);
       }

@@ -7,7 +7,8 @@ import loadVersion from "vite-plugin-package-version";
 import { VitePWA } from "vite-plugin-pwa";
 import checker from "vite-plugin-checker";
 import { handlebars } from "./plugins/handlebars";
-import { notorrentApiPlugin } from "./plugins/notorrent-api";
+import { streamProxyPlugin } from "./plugins/stream-proxy";
+import { downloadsApiPlugin } from "./plugins/downloads-api";
 import { PluginOption, loadEnv, splitVendorChunkPlugin } from "vite";
 import { visualizer } from "rollup-plugin-visualizer";
 
@@ -132,7 +133,8 @@ export default defineConfig(({ mode }) => {
         },
       }),
       loadVersion(),
-      notorrentApiPlugin(),
+      streamProxyPlugin(),
+      downloadsApiPlugin(),
       checker({
         overlay: {
           position: "tr",
@@ -207,53 +209,6 @@ export default defineConfig(({ mode }) => {
 
     server: {
       proxy: {
-        // ── VidFast 2 — Cloudflare Worker (encryption toolkit) ──────────
-        "/api/vidfast2-worker": {
-          target: "https://vidfast.samxerz-zeticuz.workers.dev",
-          changeOrigin: true,
-          rewrite: (requestPath: string) => {
-            const withoutBase = requestPath.replace(/^\/api\/vidfast2-worker/, "");
-            // Query-param style: /api/vidfast2-worker?wp=route-config&path=...
-            // Convert to path-style for the worker: /route-config?path=...
-            const wpMatch = withoutBase.match(/^\?wp=([^&]+)(.*)/);
-            if (wpMatch) {
-              const ep = decodeURIComponent(wpMatch[1]);
-              const rest = wpMatch[2]; // "&path=..." or ""
-              return "/" + ep + (rest ? rest.replace(/^&/, "?") : "");
-            }
-            return withoutBase;
-          },
-        },
-        // ── VidFast 2 — vidfast.vc direct API calls ─────────────────────
-        "/api/vidfast2-vc": {
-          target: "https://vidfast.vc",
-          changeOrigin: true,
-          rewrite: (requestPath) => requestPath.replace(/^\/api\/vidfast2-vc/, ""),
-          // The browser can't set User-Agent or Referer via fetch() — the
-          // proxy must inject them server-side. These are static constants
-          // from the worker's config.js.
-          headers: {
-            "Referer": "https://vidfast.vc/",
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        },
-        // VidFast2 playback only: route the CDN playlist/segments through
-        // the known-working M3U8 proxy while retaining the requested query.
-        "/api/vidfast2-stream": {
-          target: "https://pstream.dovetechnology.org",
-          changeOrigin: true,
-          rewrite: (requestPath: string) => {
-            const withoutBase = requestPath.replace(/^\/api\/vidfast2-stream/, "");
-            const spMatch = withoutBase.match(/^\?sp=([^&]+)(.*)/);
-            if (spMatch) {
-              const kind = decodeURIComponent(spMatch[1]);
-              const rest = spMatch[2];
-              return "/" + kind + (rest ? rest.replace(/^&/, "?") : "");
-            }
-            return withoutBase;
-          },
-        },
 
         // ── TMDB — metadata (server-side key, same-origin browser request) ─
         "/api/tmdb": {

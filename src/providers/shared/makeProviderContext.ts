@@ -5,6 +5,8 @@ export interface ProviderContextOptions {
   name: string;
   rank: number;
   disabled?: boolean;
+  /** Restrict the provider to specific media types (default: movie + show). */
+  mediaTypes?: ReadonlyArray<"movie" | "show">;
   scrape: (ctx: any) => Promise<any>;
 }
 
@@ -32,7 +34,7 @@ export function makeProviderContext(options: ProviderContextOptions) {
     disabled: options.disabled ?? false,
     type: "source" as const,
     externalSource: false,
-    mediaTypes: ["movie", "show"] as const,
+    mediaTypes: options.mediaTypes ?? (["movie", "show"] as const),
     flags: [flags.CORS_ALLOWED] as Flags[],
     scrapeMovie: scrapeWrapper,
     scrapeShow: scrapeWrapper,

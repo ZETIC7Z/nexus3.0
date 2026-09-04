@@ -1,7 +1,9 @@
 /* eslint-disable no-console */
+
 import { ScrapeMedia } from "@nexus/providers";
 
 import { downloadCaption } from "@/backend/helpers/subs";
+import { preloadDownloads } from "@/utils/downloadPreload";
 import { MakeSlice } from "@/stores/player/slices/types";
 import {
   SourceQuality,
@@ -13,6 +15,20 @@ import googletranslate from "@/utils/translation/googletranslate";
 import { translate } from "@/utils/translation/index";
 import { useAudioTrackStore } from "@/utils/player/audioTracks";
 import { ValuesOf } from "@/utils/common/typeguard";
+
+// Console hygiene: subtitle auto-load retries can fail repeatedly (CORS etc).
+// Warn only once per session so the dev tools console stays clean.
+let autoCaptionWarnedOnce = false;
+
+// OpenSubtitles download links never send CORS headers, so they cannot be
+// auto-loaded directly (extension/proxy selections still support them).
+function isDirectlyUnloadableCaption(url: string): boolean {
+  try {
+    return new URL(url).hostname === "dl.opensubtitles.org";
+  } catch {
+    return false;
+  }
+}
 
 export const playerStatus = {
   IDLE: "idle",
@@ -249,6 +265,15 @@ export const createSourceSlice: MakeSlice<SourceSlice> = (set, get) => ({
         delete s.failedEmbedsPerMedia[newMediaKey];
       }
     });
+
+    // Warm the Downloads menu (MKV links + subtitles) the moment a title is
+    // chosen, so everything is ready before the user opens the menu.
+    preloadDownloads(
+      meta.type,
+      meta.tmdbId,
+      meta.season?.number,
+      meta.episode?.number,
+    );
   },
   setCaption(caption) {
     const store = get();
@@ -329,7 +354,11 @@ export const createSourceSlice: MakeSlice<SourceSlice> = (set, get) => ({
         s.interface.error = undefined;
       });
       store.display?.load({
-        source: selectedQuality,
+        source: {
+          ...selectedQuality,
+          headers: store.source.headers,
+          preferredHeaders: store.source.preferredHeaders,
+        },
         startAt: store.progress.time,
         automaticQuality: false,
         preferredQuality: quality,
@@ -479,24 +508,61 @@ export const createSourceSlice: MakeSlice<SourceSlice> = (set, get) => ({
         if (matchedCaption && !currentStore.caption.selected) {
           console.log(`Auto-enabling subtitles: ${matchedCaption.id} (${matchedCaption.language})`);
           const { downloadCaption: importedDownloadCaption } = await import("@/backend/helpers/subs");
-          importedDownloadCaption(matchedCaption)
-            .then((srtData) => {
-              get().setCaption({
-                id: matchedCaption.id,
-                language: matchedCaption.language,
-                url: matchedCaption.url,
-                srtData,
-              });
-              // Always enable subtitles — default ON for all providers
-              useSubtitleStore.getState().setSubtitle(true, matchedCaption.language, matchedCaption.id);
-            })
-            .catch((err) => console.error("Failed to auto-load caption:", err));
+          // Try candidates in order and stop at the first that downloads.
+          // OpenSubtitles download URLs are CORS-blocked in browsers, so
+          // CORS-friendly sources (wyzie/vdrk) are preferred; each failed
+          // candidate is skipped silently and only an all-fail logs a warning.
+          const pool = currentStore.captionList.filter(
+            (c) => !isDirectlyUnloadableCaption(c.url),
+          );
+          const bestNonOpenSubs =
+            pool.find(
+              (c) =>
+                !c.opensubtitles &&
+                (c.language === targetLang || c.language.startsWith(targetLang)),
+            ) ??
+            pool.find(
+              (c) => !c.opensubtitles && (c.language === "en" || c.language.startsWith("en")),
+            ) ??
+            pool.find((c) => !c.opensubtitles);
+          const candidates = [bestNonOpenSubs, matchedCaption]
+            .concat(pool.filter((c) => c !== bestNonOpenSubs && c !== matchedCaption && !c.opensubtitles))
+            .filter((c): c is CaptionListItem => Boolean(c));
+          const uniqueCandidates = [...new Map(candidates.map((c) => [c.id, c])).values()]
+            .filter((c) => !isDirectlyUnloadableCaption(c.url))
+            .slice(0, 4);
+          void (async () => {
+            for (const candidate of uniqueCandidates) {
+              try {
+                const srtData = await importedDownloadCaption(candidate);
+                if (get().caption.selected) return;
+                get().setCaption({
+                  id: candidate.id,
+                  language: candidate.language,
+                  url: candidate.url,
+                  srtData,
+                });
+                // Always enable subtitles — default ON for all providers
+                useSubtitleStore.getState().setSubtitle(true, candidate.language, candidate.id);
+                return;
+              } catch {
+                // Try the next candidate quietly.
+              }
+            }
+            if (!autoCaptionWarnedOnce) {
+              autoCaptionWarnedOnce = true;
+              console.warn("Subtitle auto-load failed (further failures are silent)");
+            }
+          })();
         } else if (!matchedCaption) {
-          console.log("No external subtitle found for auto-enable.");
+          // No external subtitle found: normal, not worth logging.
         }
       }
     } catch (error) {
-      console.error("Failed to scrape external subtitles:", error);
+      if (!autoCaptionWarnedOnce) {
+          autoCaptionWarnedOnce = true;
+          console.warn("External subtitle scrape failed (further failures are silent):", error);
+        }
     } finally {
       set((s) => {
         s.isLoadingExternalSubtitles = false;

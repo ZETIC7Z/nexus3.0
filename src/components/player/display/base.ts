@@ -1,8 +1,6 @@
 import fscreen from "fscreen";
 import Hls, { Level } from "hls.js";
 
-import { ArtemisRetryLoader } from "@/components/player/display/hlsRetryLoader";
-
 import {
   RULE_IDS,
   isExtensionActiveCached,
@@ -23,7 +21,6 @@ import {
   SourceQuality,
   getPreferredQuality,
 } from "@/stores/player/utils/qualities";
-import { processCdnLink } from "@/utils/hosting/cdn";
 import {
   canChangeVolume,
   canFullscreen,
@@ -32,8 +29,10 @@ import {
   canPlayHlsNatively,
   canWebkitFullscreen,
   canWebkitPictureInPicture,
+  isIOS,
 } from "@/utils/browser/detectFeatures";
 import { makeEmitter } from "@/utils/common/events";
+import { isSameOriginStreamProxyUrl } from "@/utils/hosting/cdn";
 
 const levelConversionMap: Record<number, SourceQuality> = {
   360: "360",
@@ -79,6 +78,13 @@ function hlsLevelsToQualities(levels: Level[]): SourceQuality[] {
 function sortLevelsByQuality(levels: Level[]): Level[] {
   return [...levels].sort((a, b) => (b.height || 0) - (a.height || 0));
 }
+
+// Mobile devices get leaner buffers and a lower ABR starting estimate:
+// less RAM, smaller screens and slower networks. Desktop keeps the deep
+// buffer that makes seeking instant.
+const IS_MOBILE =
+  isIOS || /Android|Mobile/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints ?? 0) > 1;
 
 export function makeVideoElementDisplayInterface(): DisplayInterface {
   const { emit, on, off } = makeEmitter<DisplayInterfaceEvents>();
@@ -199,10 +205,13 @@ export function makeVideoElementDisplayInterface(): DisplayInterface {
   }
 
   function setupSource(vid: HTMLVideoElement, src: LoadableSource) {
-    hls = null;
+    if (hls) {
+      hls.destroy();
+      hls = null;
+    }
     if (src.type === "hls") {
       if (canPlayHlsNatively(vid)) {
-        vid.src = processCdnLink(src.url);
+        vid.src = src.url;
         vid.currentTime = startAt;
         return;
       }
@@ -212,9 +221,15 @@ export function makeVideoElementDisplayInterface(): DisplayInterface {
       if (!hls) {
         hls = new Hls({
           autoStartLoad: true,
-          maxBufferLength: 120, // 120 seconds
-          maxMaxBufferLength: 240,
-          abrEwmaDefaultEstimate: 5 * 1000 * 1000, // 5 Mbps default bandwidth estimate for better ABR decisions
+          // Device-aware buffering: mobile keeps a short, memory-friendly
+          // window; desktop buffers deep for instant seeking.
+          maxBufferLength: IS_MOBILE ? 30 : 120,
+          maxMaxBufferLength: IS_MOBILE ? 60 : 240,
+          backBufferLength: IS_MOBILE ? 30 : Infinity,
+          capLevelToPlayerSize: IS_MOBILE,
+          abrEwmaDefaultEstimate: IS_MOBILE
+            ? 1.5 * 1000 * 1000 // 1.5 Mbps - avoid 4K starts on cell data
+            : 5 * 1000 * 1000, // 5 Mbps default bandwidth estimate for better ABR decisions
           fragLoadPolicy: {
             default: {
               maxLoadTimeMs: 30 * 1000, // allow it load extra long, fragments are slow if requested for the first time on an origin
@@ -232,18 +247,31 @@ export function makeVideoElementDisplayInterface(): DisplayInterface {
             },
           },
           renderTextTracksNatively: false,
-          loader: ArtemisRetryLoader as any,
           xhrSetup: (xhr, url) => {
-            if (typeof url === "string" && url.includes("erlook")) {
-              try { xhr.overrideMimeType("application/octet-stream"); } catch {}
-            }
+            if (isSameOriginStreamProxyUrl(url)) return;
+            const requestHeaders = {
+              ...src.preferredHeaders,
+              ...src.headers,
+            };
+            Object.entries(requestHeaders).forEach(([key, value]) => {
+              try {
+                xhr.setRequestHeader(key, value);
+              } catch {
+                // Browsers reject restricted headers such as Referer/User-Agent.
+              }
+            });
           },
         });
         const exceptions = [
           "Failed to execute 'appendBuffer' on 'SourceBuffer': This SourceBuffer has been removed from the parent media source.",
         ];
         hls?.on(Hls.Events.ERROR, (event, data) => {
-          console.error("HLS error", data);
+          // Recoverable hls.js errors (buffer stalls, fragment retries, level
+          // switches) are normal while streaming - only fatal errors belong in
+          // the console so real problems stay visible.
+          if (data.fatal) {
+            console.error("HLS error", data);
+          }
 
           // Extract detailed HLS error information
           const hlsErrorInfo = {
@@ -364,12 +392,12 @@ export function makeVideoElementDisplayInterface(): DisplayInterface {
       }
 
       hls.attachMedia(vid);
-      hls.loadSource(processCdnLink(src.url));
+      hls.loadSource(src.url);
       vid.currentTime = startAt;
       return;
     }
 
-    vid.src = processCdnLink(src.url);
+    vid.src = src.url;
     vid.currentTime = startAt;
   }
 
@@ -407,7 +435,7 @@ export function makeVideoElementDisplayInterface(): DisplayInterface {
           lastQualitySwitchTimestamp = Date.now();
           const isPaused = videoElement.paused;
           const currentTime = videoElement.currentTime;
-          videoElement.src = processCdnLink(stream.url);
+          videoElement.src = stream.url;
           videoElement.currentTime = currentTime;
           if (!isPaused) {
             videoElement.play().catch(() => {});
@@ -865,7 +893,7 @@ export function makeVideoElementDisplayInterface(): DisplayInterface {
           if (stream && videoElement) {
             const isPaused = videoElement.paused;
             const currentTime = videoElement.currentTime;
-            videoElement.src = processCdnLink(stream.url);
+            videoElement.src = stream.url;
             videoElement.currentTime = currentTime;
             if (!isPaused) {
               videoElement.play().catch(() => {});

@@ -1,116 +1,58 @@
 // nexus-providers-index.ts
 // NEXUS — Provider Registry
 // ---------------------------------------------------------------------------
-// Sources (shown in the player source list, tried in rank order):
-//   1. Zephyr        — CF Worker + vidfast.vc (movies, TV)
-//   2. NoTorrent     — Stremio addon → language-labeled servers
-//   3. VidCore       — Supreme/Prime → Server 1, 2...
-//   4. Videasy       — movies, TV
-//   5. VidUp         — movies, TV (moon CDN)
-//   6. VidFast       — movies, TV
-//   7. AniKoto       — anime, dub support
-//   8. AniKai        — anime, sub only
+// All playback sources come from the TMDB-Embed HF backend
+// (stycanine1-tmdb-embed-api.hf.space). Only browser-playable providers are
+// registered here — MKV-only providers (4KHDHub, DahmerMovies, StreamFlix)
+// are download sources surfaced in the Downloads menu instead.
 // ---------------------------------------------------------------------------
 
-import { vidfast2Provider } from "./zephyr/provider";
-import { makeStandaloneSource } from "./embeds/shared";
-import { makeEmbedContext } from "./shared/makeProviderContext";
-import { flags } from "@nexus/providers";
+import type { ScrapeMedia } from "@nexus/providers";
+
+import {
+  nexusEmbedSources,
+  NEXUS_PROVIDER_CATALOG,
+  type EmbedMediaRequest,
+} from "./embeds/shared";
 import { getHealthyProviders, type ProbeableProvider } from "./provider-health";
 
-// ── Movie / TV sources ──────────────────────────────────────────────────
-export const notorrentSource = makeStandaloneSource({
-  id: "nexus-notorrent", name: "NoTorrent", rank: 970, backend: "notorrent",
-});
+export { NEXUS_PROVIDER_CATALOG } from "./embeds/shared";
 
-export const vidcoreSource = makeStandaloneSource({
-  id: "nexus-vidcore", name: "VidCore", rank: 960, backend: "vidcore",
-});
+// ── Source list (ordered by rank — highest tried first) ─────────────────
+export const nexusCustomProviders = nexusEmbedSources;
 
-export const videasySource = makeStandaloneSource({
-  id: "nexus-videasy", name: "Videasy", rank: 950, backend: "videasy",
-});
+// ── Legacy server-embed support (no longer used by new providers) ───────
+export const nexusCustomEmbeds = [] as const;
 
-export const vidupSource = makeStandaloneSource({
-  id: "nexus-vidup", name: "VidUp", rank: 940, backend: "vidup",
-});
-
-export const vidfastSource = makeStandaloneSource({
-  id: "nexus-vidfast", name: "VidFast", rank: 930, backend: "vidfast",
-});
-
-// ── Anime sources ───────────────────────────────────────────────────────
-export const anikotoSource = makeStandaloneSource({
-  id: "nexus-anikoto", name: "AniKoto", rank: 900, backend: "anikoto", anime: true,
-});
-
-export const anikaiSource = makeStandaloneSource({
-  id: "nexus-anikai", name: "AniKai", rank: 890, backend: "anikai", anime: true,
-});
-
-// ── Source list (ordered by rank, highest tried first) ──────────────────
-export const nexusCustomProviders = [
-  vidfast2Provider,  // 1330 — Zephyr
-  notorrentSource,   // 970  — NoTorrent
-  vidcoreSource,     // 960  — VidCore
-  videasySource,     // 950  — Videasy
-  vidupSource,       // 940  — VidUp
-  vidfastSource,     // 930  — VidFast
-  anikotoSource,     // 900  — AniKoto (anime)
-  anikaiSource,      // 890  — AniKai (anime)
-] as const;
-
-// ── Numbered server embeds (for per-provider server selection) ──────────
-const makeServerEmbed = (n: number) => makeEmbedContext({
-  id: `nexus-server-${n}`,
-  name: `Server ${n}`,
-  rank: 1000 - n,
-  async scrape(ctx: any) {
-    const raw = (ctx as any).url ?? "";
-    if (!raw) throw new Error("No URL");
-    // Decode packed JSON from the standalone source:
-    // { url, captions, quality, label, language }
-    let url: string = raw;
-    let captions: any[] = [];
-    let label = "Original";
-    let language = "und";
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed.url) {
-        url = parsed.url;
-        captions = parsed.captions || [];
-        if (parsed.label) label = parsed.label;
-        if (parsed.language) language = parsed.language;
-      }
-    } catch {
-      // plain URL — no extras
-    }
-    const isHls = url.includes(".m3u8") || url.includes("m3u8-proxy");
-    return {
-      embeds: [],
-      stream: [isHls
-        ? { id: `srv${n}-hls`, type: "hls", playlist: url, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language, url, default: true }] }
-        : { id: `srv${n}-mp4`, type: "file", qualities: { unknown: { type: "mp4", url } }, flags: [flags.CORS_ALLOWED], captions, headers: {}, skipValidation: true, audioTracks: [{ id: `srv${n}-orig`, label, language, url, default: true }] }
-      ],
-    };
-  },
-});
-
-export const nexusCustomEmbeds = [
-  makeServerEmbed(1), makeServerEmbed(2), makeServerEmbed(3),
-  makeServerEmbed(4), makeServerEmbed(5), makeServerEmbed(6),
-] as const;
-
-export { vidfast2Provider } from "./zephyr/provider";
-export { getHealthyProviders, getHealthSnapshot, invalidateHealth } from "./provider-health";
-export type { ProviderHealth } from "./provider-health";
 export type NexusCustomProvider = (typeof nexusCustomProviders)[number];
 
+export { getHealthyProviders, getHealthSnapshot, invalidateHealth } from "./provider-health";
+export type { ProviderHealth } from "./provider-health";
+
+function toHealthMedia(media?: ScrapeMedia): EmbedMediaRequest | undefined {
+  if (!media) return undefined;
+  if (media.type === "movie") {
+    return { tmdbId: String(media.tmdbId), type: "movie" };
+  }
+  return {
+    tmdbId: String(media.tmdbId),
+    type: "show",
+    season: { number: Number(media.season?.number) || 1 },
+    episode: { number: Number(media.episode?.number) || 1 },
+  };
+}
+
 export async function getLiveNexusProviders(
-  builtinSources: { id: string; name: string }[] = [],
+  media?: ScrapeMedia,
+  builtinSources?: { id: string; name: string }[],
 ): Promise<ProbeableProvider[]> {
-  const healthyCustom = await getHealthyProviders(
-    nexusCustomProviders.map((p) => ({ id: p.id, name: p.name, disabled: p.disabled })),
+  const healthy = await getHealthyProviders(
+    NEXUS_PROVIDER_CATALOG.filter((p) => p.playable).map((p) => ({
+      id: `nexus-${p.id}`,
+      name: p.name,
+      disabled: false,
+    })),
+    toHealthMedia(media),
   );
-  return [...healthyCustom, ...builtinSources];
+  return [...healthy, ...(builtinSources ?? [])];
 }

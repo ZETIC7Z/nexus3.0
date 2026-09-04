@@ -12,6 +12,23 @@ import {
   parseVttSubtitles,
 } from "../utils/captions";
 
+// Captions whose download already failed this session (CORS-blocked hosts,
+// dead URLs). Auto-select never retries them, keeping the console clean.
+const failedCaptionIds = new Set<string>();
+const MAX_AUTO_CAPTION_ATTEMPTS = 3;
+let autoCaptionAttempts = 0;
+
+// OpenSubtitles download links never send CORS headers, so they can only
+// load through the extension/proxy path - never as a direct auto-select.
+const CORS_DEAD_CAPTION_HOSTS = ["dl.opensubtitles.org"];
+function isLikelyDeadCaptionUrl(url: string): boolean {
+  try {
+    return CORS_DEAD_CAPTION_HOSTS.includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function useCaptions() {
   const setSubtitle = useSubtitleStore((s) => s.setSubtitle);
   const enabled = useSubtitleStore((s) => s.enabled);
@@ -93,8 +110,13 @@ export function useCaptions() {
       };
 
       if (!caption.hls) {
-        const srtData = await downloadCaption(caption);
-        captionToSet.srtData = srtData;
+        try {
+          const srtData = await downloadCaption(caption);
+          captionToSet.srtData = srtData;
+        } catch (err) {
+          failedCaptionIds.add(caption.id);
+          throw err;
+        }
       } else {
         // request a language change to hls, so it can load the subtitles
         await setSubtitlePreference?.(caption.language);
@@ -150,13 +172,43 @@ export function useCaptions() {
   }, [setCaption, setSubtitle, setIsOpenSubtitles]);
 
   const selectLastUsedLanguage = useCallback(async () => {
-    if (lastSelectedSubtitleId) {
-      const caption = captions.find((v) => v.id === lastSelectedSubtitleId);
-      if (caption) return selectCaptionById(caption.id);
+    // Cap automatic attempts per session: a dead preferred caption must not
+    // be retried on every captionList update (console noise + wasted calls).
+    if (autoCaptionAttempts >= MAX_AUTO_CAPTION_ATTEMPTS) return false;
+    autoCaptionAttempts += 1;
+
+    if (
+      lastSelectedSubtitleId &&
+      !failedCaptionIds.has(lastSelectedSubtitleId)
+    ) {
+      const caption = captions.find(
+        (v) =>
+          v.id === lastSelectedSubtitleId &&
+          !isLikelyDeadCaptionUrl(v.url),
+      );
+      if (caption) {
+        try {
+          return await selectCaptionById(caption.id);
+        } catch {
+          // Dead saved URL - fall through to the language fallback below.
+        }
+      }
     }
 
     const language = lastSelectedLanguage ?? "en";
-    await selectLanguage(language);
+    const candidate = captions.find(
+      (v) =>
+        v.language === language &&
+        !failedCaptionIds.has(v.id) &&
+        !isLikelyDeadCaptionUrl(v.url),
+    );
+    if (candidate) {
+      try {
+        return await selectCaptionById(candidate.id);
+      } catch {
+        // All candidates for this language are dead; stay quiet.
+      }
+    }
     return true;
   }, [
     lastSelectedLanguage,
@@ -236,7 +288,7 @@ export function useCaptions() {
 
       if (sameLanguageCaption) {
         // Automatically select the first caption with the same language
-        selectCaptionById(sameLanguageCaption.id);
+        selectCaptionById(sameLanguageCaption.id).catch(() => {});
       } else {
         // No caption with the same language found, clear the selection
         setCaption(null);

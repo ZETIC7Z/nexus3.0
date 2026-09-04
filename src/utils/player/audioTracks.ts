@@ -18,7 +18,10 @@ export interface AudioTrack {
   label: string;      // "Original", "Tagalog", "Hindi", "English Dub", ...
   language: string;   // "und", "tl", "hi", "en", ...
   url: string;        // MP4 or HLS (m3u8) URL for this language
+  type?: "hls" | "mp4";
   default: boolean;
+  headers?: Record<string, string>;
+  preferredHeaders?: Record<string, string>;
 }
 
 interface AudioTrackState {
@@ -61,10 +64,15 @@ export function switchAudioTrack(videoEl: HTMLVideoElement, track: AudioTrack): 
   const resumeAt = videoEl.currentTime;
 
   // HLS track — re-init hls.js with the new playlist via the player display.
-  if (track.url.includes(".m3u8")) {
+  if (track.type === "hls" || track.url.includes(".m3u8")) {
     const store = usePlayerStore.getState();
     store.display?.load({
-      source: { type: "hls", url: track.url },
+      source: {
+        type: "hls",
+        url: track.url,
+        headers: track.headers,
+        preferredHeaders: track.preferredHeaders,
+      },
       startAt: resumeAt,
       automaticQuality: true,
       preferredQuality: null,
