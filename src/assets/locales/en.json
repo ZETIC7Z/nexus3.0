@@ -1500,6 +1500,18 @@
       }
     },
     "preferences": {
+      "ads": {
+        "title": "Disable advertisements",
+        "description": "Hide ads across the site.",
+        "on": "Ads are enabled",
+        "off": "Ads are disabled",
+        "confirm": {
+          "title": "Wait... are you sure?",
+          "body": "Ads are basically the only thing keeping the lights on around here. Every time someone turns them off, we lose the revenue that pays for the servers you’re using right now. If you disable them, we won’t earn anything from your visits for the next 7 days. We get it, ads are annoying, but please consider leaving them on.",
+          "keep": "Keep ads on",
+          "disable": "Disable anyway"
+        }
+      },
       "title": "Preferences",
       "experimentalSection": "Experimental",
       "autoSubtitleSyncLabel": "Auto subtitle syncing",
