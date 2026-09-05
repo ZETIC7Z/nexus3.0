@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { Icon, Icons } from "@/components/Icon";
 
 import { conf } from "@/setup/config";
+import { useAdsStore } from "@/stores/ads";
 
 
 const BTAG_SRC = "https://aqle3.com/btag.min.js";
@@ -182,6 +183,11 @@ function PrimaryGifBanner({ img, href }: { img: string; href: string }) {
 
 export function HomeAd({ slot = "primary" }: { slot?: AdSlot } = {}) {
   const cfg = conf();
+  const adsDisabled = useAdsStore((s) => s.adsDisabled);
+
+  // User turned ads off in Settings → Preferences. Return before any slot
+  // mounts so the btag script is never injected and banners never render.
+  if (adsDisabled) return null;
 
   if (slot === "primary") {
     const gifUrl =

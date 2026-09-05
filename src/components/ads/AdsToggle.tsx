@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
+import { Toggle } from "@/components/buttons/Toggle";
 import { useAdsStore } from "@/stores/ads";
 
 /**
- * "Disable advertisements" switch (p-stream style).
- * Ads are ON by default; users can switch them off after confirming.
+ * "Disable advertisements" switch.
+ * Ads are ON by default; the user can switch them off after confirming.
  */
 export function AdsToggle() {
   const { t } = useTranslation();
@@ -24,6 +25,12 @@ export function AdsToggle() {
 
   return (
     <div>
+      <p className="text-white font-bold mb-3">
+        {t("settings.preferences.ads.title")}
+      </p>
+      <p className="max-w-[25rem] font-medium">
+        {t("settings.preferences.ads.description")}
+      </p>
       <div
         role="button"
         tabIndex={0}
@@ -31,21 +38,14 @@ export function AdsToggle() {
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") handleClick();
         }}
-        className="px-4 py-3 select-none flex items-start gap-4 transition-colors cursor-pointer hover:bg-white/[0.03]"
+        className="bg-dropdown-background hover:bg-dropdown-hoverBackground select-none my-4 cursor-pointer space-x-3 flex items-center max-w-[25rem] py-3 px-4 rounded-lg outline-none focus:ring-2 focus:ring-[hsl(var(--colors-active))]"
       >
-        <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold leading-snug">
-            {t("settings.preferences.ads.title")}
-          </p>
-          <p className="text-sm text-type-secondary mt-1 leading-snug">
-            {t("settings.preferences.ads.description")}
-          </p>
-        </div>
-        <div className="shrink-0 pt-0.5">
-          <span className="text-xs font-semibold text-type-secondary">
-            {adsDisabled ? t("settings.preferences.ads.off") : t("settings.preferences.ads.on")}
-          </span>
-        </div>
+        <span className="flex-1 font-medium">
+          {adsDisabled
+            ? t("settings.preferences.ads.off")
+            : t("settings.preferences.ads.on")}
+        </span>
+        <Toggle enabled={!adsDisabled} />
       </div>
 
       {showConfirm && (

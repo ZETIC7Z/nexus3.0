@@ -18,6 +18,7 @@ import {
 import { TMDBContentTypes } from "@/backend/metadata/types/tmdb";
 import { KID_SAFE_GENRES } from "@/utils/media/kidsSearch";
 import { useProfileStore } from "@/stores/profiles";
+import { useAdsStore } from "@/stores/ads";
 
 import { AuthModal } from "@/components/overlays/auth";
 import { DetailsModal } from "@/components/overlays/detailsModal";
@@ -238,6 +239,8 @@ function App() {
     // mid-playback is exactly the kind of thing that tanks retention.
     if (isWatchPage) return;
     const cfg = conf();
+    // Respect the user's "Disable advertisements" choice from Settings.
+    if (useAdsStore.getState().adsDisabled) return;
     if (!cfg.ENABLE_POPUNDER || !cfg.POPUNDER_SCRIPT_URL) return;
     if (typeof document === "undefined") return;
     if (document.querySelector("script[data-popunder]")) return;

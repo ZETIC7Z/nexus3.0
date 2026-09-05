@@ -932,6 +932,7 @@
       "settings": {
         "downloadItem": "Download",
         "castItem": "Cast to device",
+        "castStop": "Stop casting",
         "castArtemisOnly": "Only available on Artemis",
         "enableSubtitles": "Enable Subtitles",
         "experienceSection": "Viewing experience",
@@ -1498,6 +1499,9 @@
         "syncing": "Syncing...",
         "disconnect": "Disconnect"
       }
+    },
+    "ads": {
+      "title": "Advertisements"
     },
     "preferences": {
       "ads": {

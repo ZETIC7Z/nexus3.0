@@ -84,10 +84,44 @@ function BaseContainer(props: { children?: ReactNode }) {
 }
 
 export function Container(props: PlayerProps) {
+  const isFullscreen = usePlayerStore((s) => s.interface.isFullscreen);
   const propRef = useRef(props.onLoad);
   useEffect(() => {
     propRef.current?.();
   }, []);
+
+  // Auto-rotation for mobile fullscreen (ported from the legacy NEXUS player):
+  // entering fullscreen on a phone locks landscape; leaving unlocks.
+  useEffect(() => {
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent,
+      ) || window.innerWidth <= 768;
+
+    if (isMobile && isFullscreen) {
+      if (
+        window.screen.orientation &&
+        (window.screen.orientation as unknown as {
+          lock: (o: string) => Promise<void>;
+        }).lock
+      ) {
+        (window.screen.orientation as unknown as {
+          lock: (o: string) => Promise<void>;
+        })
+          .lock("landscape")
+          .catch((err: unknown) => {
+            console.error("Failed to lock orientation:", err);
+          });
+      }
+    } else if (isMobile && !isFullscreen) {
+      if (
+        window.screen.orientation &&
+        (window.screen.orientation as unknown as { unlock: () => void }).unlock
+      ) {
+        window.screen.orientation.unlock();
+      }
+    }
+  }, [isFullscreen]);
 
   return (
     <div className="relative">

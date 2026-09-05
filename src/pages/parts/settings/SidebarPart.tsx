@@ -46,6 +46,11 @@ export function SidebarPart(props: {
         icon: Icons.LINK,
       },
       {
+        textKey: "settings.ads.title",
+        id: "settings-ads",
+        icon: Icons.COINS,
+      },
+      {
         textKey: "settings.letterboxd.title",
         id: "settings-import",
         icon: Icons.CLOUD_ARROW_UP,

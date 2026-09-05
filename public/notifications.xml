@@ -4,7 +4,27 @@
     <title>NEXUS Notifications</title>
     <description>Site updates, feature announcements, and important alerts for NEXUS users</description>
     <language>en</language>
-    <lastBuildDate>Fri, 05 Sep 2026 00:15:00 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 05 Sep 2026 13:40:00 +0800</lastBuildDate>
+    <item>
+      <guid>nexus-notif-2026-09-05-ads-toggle</guid>
+      <title>🚫 New: Turn off ads in Settings (and they actually turn off)</title>
+      <description>The "Disable advertisements" switch now works for real (Sep 5, 2026):
+
+**What it does**
+• Settings → Preferences → "Disable advertisements" now hides every ad on the site — homepage banners, the primary banner card, the bookmarks/secondary ad slots, and the popunder
+• No ad script even loads while ads are off, so browsing stays light
+• Your choice is remembered on this device; turning ads back on is instant, no confirm needed
+
+**Why we ask twice**
+• Turning ads OFF shows a quick confirmation — ads are the only thing paying for the servers
+• We won't earn anything from your visits for 7 days after you disable them, so please consider keeping them on if you can
+
+Found under Settings → Preferences. Thank you for supporting NEXUS! 🍿
+      </description>
+      <link>https://discord.gg/Jrj3w6t9mY</link>
+      <pubDate>Sat, 05 Sep 2026 13:40:00 +0800</pubDate>
+      <category>feature</category>
+    </item>
     <item>
       <guid>nexus-notif-2026-09-05-v32-tipjar-devices</guid>
       <title>🎁 Tip Jar &amp; Device Security — NEXUS 3.2 final polish</title>

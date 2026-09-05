@@ -42,6 +42,7 @@ export function Navigation(_props: NavigationProps) {
   const isWatchPage = location.pathname.startsWith("/media/");
   const isKidsPage = location.pathname === "/kids";
   const isProfilesPage = location.pathname === "/profiles";
+  const isSettingsPage = location.pathname.startsWith("/settings");
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -97,6 +98,33 @@ export function Navigation(_props: NavigationProps) {
 
   // Don't render on watch page or profiles page
   if (isWatchPage || isProfilesPage) return null;
+
+  // Settings page: logo-only header. Nav links and the search/bell/download/
+  // avatar icons are hidden so they never overlap the floating settings
+  // search bar (desktop) or crowd the small-screen header.
+  if (isSettingsPage) {
+    return (
+      <nav
+        className={classNames(
+          "fixed top-0 left-0 right-0 z-[500] transition-all duration-300 ease-out h-16",
+          isScrolled
+            ? "bg-[#141414] shadow-lg"
+            : "bg-gradient-to-b from-black/80 to-transparent",
+        )}
+        style={{ paddingTop: `${bannerHeight}px` }}
+      >
+        <div className="flex items-center px-4 md:px-8 lg:px-12 h-16">
+          <Link
+            to={loggedIn ? "/browse" : "/"}
+            className="flex-shrink-0"
+            onClick={() => window.scrollTo(0, 0)}
+          >
+            <BrandPill clickable header />
+          </Link>
+        </div>
+      </nav>
+    );
+  }
 
   // Kids profile: simplified header — logo, "Kids" label, an inline search
   // (same as the main profile) and the kids avatar. No nav links, no

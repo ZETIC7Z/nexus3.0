@@ -60,11 +60,9 @@ export function SettingsMenu({ id }: { id: string }) {
 
   const { isCasting, chromecastAvailable, airplayAvailable, startChromecast, startAirplay, stop } =
     useCasting();
-  const isArtemis = currentSourceId === "artemis";
   const castPlatformAvailable = chromecastAvailable || airplayAvailable;
 
   const requestCast = () => {
-    if (!isArtemis) return;
     if (isCasting) {
       stop();
       return;
@@ -154,16 +152,20 @@ export function SettingsMenu({ id }: { id: string }) {
         </Menu.Link>
         {castPlatformAvailable ? (
           <Menu.Link
-            clickable={isArtemis}
-            disabled={!isArtemis}
+            clickable
             onClick={requestCast}
-            rightSide={<Icon className="text-xl" icon={Icons.CASTING} />}
+            rightSide={
+              <Icon
+                className="text-xl"
+                icon={isCasting ? Icons.CIRCLE_CHECK : Icons.CASTING}
+              />
+            }
           >
             <span className="flex flex-col">
               {t("player.menus.settings.castItem")}
-              {!isArtemis && (
+              {isCasting && (
                 <span className="text-type-secondary text-xs">
-                  {t("player.menus.settings.castArtemisOnly")}
+                  {t("player.menus.settings.castStop")}
                 </span>
               )}
             </span>

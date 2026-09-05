@@ -2,6 +2,9 @@ import { ReactNode, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { BrandPill } from "@/components/layout/BrandPill";
+import { MobileLockButton } from "@/components/player/atoms/MobileLockButton";
+import { MobileLockScreen } from "@/components/player/atoms/MobileLockScreen";
+import { MobilePlayerLogo } from "@/components/player/atoms/MobilePlayerLogo";
 import { Player } from "@/components/player";
 import { SkipSegmentButton } from "@/components/player/atoms/SkipSegmentButton";
 import { ThumbsFeedback } from "@/components/player/atoms/ThumbsFeedback";
@@ -127,6 +130,10 @@ export function PlayerPart(props: PlayerPartProps) {
         />
         <Player.SkipForward iconSizeClass="text-3xl" inControl={inControl} />
       </Player.CenterMobileControls>
+
+      {/* Mobile logo and lock screen - positioned independently outside center controls */}
+      <MobilePlayerLogo />
+      <MobileLockScreen />
 
       <div
         className={`absolute right-4 z-50 transition-all duration-300 ease-in-out ${

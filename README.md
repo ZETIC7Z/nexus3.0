@@ -11,6 +11,23 @@
 
 ---
 
+## 🚀 What's New — Sep 5, 2026 (v3.2.1)
+
+### 🚫 Ads Toggle — Now It Actually Works
+The "Disable advertisements" switch (Settings → Preferences) now controls every ad surface on the site:
+- **Homepage banners** (728×90 leaderboard, 300×250 secondary, 336×280 bookmarks) — never render
+- **Primary banner card** (the dismissible GIF banner) — never renders
+- **Popunder script** — never loads (previously the one slot the switch missed)
+- **No ad script loads at all** while ads are off — `aqle3.com/btag.min.js` isn't even fetched
+- Toggle hides itself entirely on deployments with no ad surfaces configured
+- Turning ads off shows a one-time confirmation (ads pay for the servers 💔); back on is instant, choice persists per device
+
+### 📣 Share Card Fix (earlier today)
+- Twitter/X share cards render a proper large image (`summary_large_image`) with refreshed descriptions
+- Share previews no longer mention long-removed providers
+
+---
+
 ## 🚀 What's New — Sep 4, 2026 (v3.2)
 
 ### ⚡ Performance Overhaul (the big one)
@@ -325,6 +342,15 @@ plugins/                           ← Vite dev-server shims for the api/ functi
 ---
 
 ## Changelog
+
+### Sep 5, 2026 (v3.2.1)
+- **Ads toggle wired up** — `useAdsStore.adsDisabled` now gates `HomeAd` (all banner slots + primary GIF banner), `AdsPart` (VITE-configured cards) and the popunder script in `App.tsx`; ad script never injected while disabled
+- **Toggle self-hides** when no ad surfaces are configured (SHOW_AD / zone IDs / banner GIF / popunder all off)
+- **In-app changelog v3.2.1** posted via the notification system
+
+### Sep 5, 2026 (morning)
+- **Social share meta** — Twitter/X `summary_large_image` card + refreshed og/twitter descriptions
+- **Advertisements toggle added** — p-stream style "Disable advertisements" row in Settings → Preferences with confirm dialog (backed by new `useAdsStore`, persisted as `__MW::ads`)
 
 ### Sep 4, 2026 (v3.2 — evening)
 - **Performance overhaul** — first-load JS 5.7 MB → 2.3 MB (lazy locales, language-db split, hls.js off boot path, lazy caption pipeline, PWA precache trim)

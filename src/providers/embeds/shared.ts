@@ -111,20 +111,23 @@ export interface EmbedMediaRequest {
   episode?: { number: number };
 }
 // hdghartv is intentionally omitted because it is not working upstream.
+// Display names use the NEXUS rebrand; the `id` slugs are the upstream
+// protocol ids the HF backend serves (/api/streams/<id>/...) and must never
+// be renamed. Order = priority: highest rank is tried first.
 export const NEXUS_PROVIDER_CATALOG: NexusProviderDef[] = [
-  { id: "anikoto", name: "AniKoto", playable: true, anime: true, rank: 1020 },
-  { id: "anikai", name: "AniKai", playable: true, anime: true, rank: 1015 },
-  { id: "videasy", name: "Videasy", playable: true, rank: 1010 },
-  { id: "vaplayer", name: "VaPlayer", playable: true, rank: 1000 },
-  { id: "netmirror", name: "NetMirror", playable: true, rank: 990 },
+  { id: "showbox", name: "Crimson 4K", playable: true, rank: 1020 },
+  { id: "castletv", name: "Scepter", playable: true, rank: 1015 },
+  { id: "zxcstreams", name: "ZyPhed", playable: true, rank: 1010 },
+  { id: "onetouchtv", name: "Scythe", playable: true, rank: 1005 },
+  { id: "netmirror", name: "Oblivion", playable: true, rank: 1000 },
+  { id: "videasy", name: "Kinetic", playable: true, rank: 995 },
+  { id: "vaplayer", name: "Apex", playable: true, rank: 990 },
+  { id: "anikoto", name: "AniKoto", playable: true, anime: true, rank: 970 },
+  { id: "anikai", name: "AniKai", playable: true, anime: true, rank: 965 },
   // VidLink/VixSrc: all endpoints currently return 403 upstream. Code is
   // kept intact - flip playable back to true to re-enable.
   { id: "vidlink", name: "VidLink", playable: false, rank: 0 },
-  { id: "castletv", name: "CastleTV", playable: true, rank: 970 },
   { id: "vixsrc", name: "VixSrc", playable: false, rank: 0 },
-  { id: "onetouchtv", name: "OneTouchTV", playable: true, rank: 950 },
-  { id: "showbox", name: "ShowBox", playable: true, rank: 940 },
-  { id: "zxcstreams", name: "ZXCStreams", playable: true, rank: 930 },
   // Yamie - direct movie endpoint (media.vidrift.in); movies only.
   { id: "yamie", name: "Yamie ❤️", playable: true, moviesOnly: true, rank: 920 },
   { id: "streamflix", name: "StreamFlix", playable: false, rank: 0 },

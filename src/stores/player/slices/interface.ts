@@ -34,6 +34,7 @@ export interface InterfaceSlice {
     showSpeedIndicator: boolean; // should the speed indicator be shown
     showAutoFallbackPopout: boolean; // should the auto-fallback popout be shown
     autoFallbackFailedSourceName: string | null; // human-readable name of the source being switched away from
+    isScreenLocked: boolean; // mobile lock screen active (Netflix-style)
   };
   updateInterfaceHovering(newState: PlayerHoverState): void;
   setSeeking(seeking: boolean): void;
@@ -47,6 +48,7 @@ export interface InterfaceSlice {
   setSpeedBoosted(state: boolean): void;
   setShowSpeedIndicator(state: boolean): void;
   setAutoFallbackPopout(state: boolean, failedSourceName?: string | null): void;
+  setScreenLocked(state: boolean): void;
 }
 
 export const createInterfaceSlice: MakeSlice<InterfaceSlice> = (set, get) => ({
@@ -68,6 +70,7 @@ export const createInterfaceSlice: MakeSlice<InterfaceSlice> = (set, get) => ({
     showSpeedIndicator: false,
     showAutoFallbackPopout: false,
     autoFallbackFailedSourceName: null,
+    isScreenLocked: false,
   },
 
   setShouldStartFromBeginning(val) {
@@ -135,6 +138,11 @@ export const createInterfaceSlice: MakeSlice<InterfaceSlice> = (set, get) => ({
       s.interface.autoFallbackFailedSourceName = state
         ? failedSourceName
         : null;
+    });
+  },
+  setScreenLocked(state) {
+    set((s) => {
+      s.interface.isScreenLocked = state;
     });
   },
 });

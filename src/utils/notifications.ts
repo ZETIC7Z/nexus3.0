@@ -301,7 +301,7 @@ export function notifyInfo(title: string, description: string, actionUrl?: strin
 // v3.0 Changelog — auto-posted on first launch after update
 // ---------------------------------------------------------------------------
 
-const V3_CHANGELOG_VERSION = "3.2.0";
+const V3_CHANGELOG_VERSION = "3.2.1";
 
 /** Format the current time in Philippine Standard Time (UTC+8). */
 export function formatPHTime(date: Date = new Date()): string {
@@ -329,18 +329,13 @@ export function announceV3Changelog(): void {
 
   store.addNotification({
     type: "info",
-    title: `🎉 NEXUS 3.2 — Faster, Smarter, Personalized (${phNow})`,
+    title: `🚫 NEXUS 3.2.1 — You can now turn ads off (${phNow})`,
     description:
-      "What's new today:\n" +
-      "• ⚡ Massive speed boost: first load is ~60% lighter — heavy features now load only when used\n" +
-      "• 👋 Personalized greetings: time-aware welcome text (morning/afternoon/night, your timezone) + your nickname when signed in\n" +
-      "• 🏳️ Top 10 in Your Country now shows your country's flag instead of a globe icon\n" +
-      "• 🔔 Smart popup system: maintenance & update notices share one slot, fade in/out, auto-close after 15s\n" +
-      "• 🧹 Notifications auto-delete after 30 days — no more endless backlogs\n" +
-      "• ⬇️ MKV downloads preload with the stream — Download menu opens instantly, only live links listed\n" +
-      "• 🍠 Yamie provider for movies (auto-hidden when offline or on TV shows)\n" +
-      "• 📱 Smoother mobile playback: device-aware buffering, data-friendly quality caps\n" +
-      "• 🐛 Fixed: MKV links wrongly filtered, TMDB rows on production, subtitle retry storms, dead-proxy stalls\n" +
+      "What's new:\n" +
+      "• 🚫 The \"Disable advertisements\" switch in Settings → Preferences now actually hides all ads: homepage banners, primary banner card, bookmarks/secondary slots, and the popunder\n" +
+      "• 🔇 With ads off, no ad script loads at all — lighter pages, quieter browsing\n" +
+      "• 💔 Turning ads off asks once for confirmation (ads pay for the servers); turning them back on is instant\n" +
+      "• 🧹 No ad surfaces configured? The switch hides itself — no dead settings\n" +
       `Released: ${phNow}`,
     version: V3_CHANGELOG_VERSION,
     autoDismissMs: 0,

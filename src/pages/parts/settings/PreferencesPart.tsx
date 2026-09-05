@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom";
 import { getAllProviders, getProviders } from "@/backend/providers/providers";
 import { Button } from "@/components/buttons/Button";
 import { Toggle } from "@/components/buttons/Toggle";
-import { AdsToggle } from "@/components/ads/AdsToggle";
 import { FlagIcon } from "@/components/FlagIcon";
 import { Dropdown } from "@/components/form/Dropdown";
 import { SortableList } from "@/components/form/SortableList";
@@ -227,8 +226,6 @@ export function PreferencesPart(props: {
                   />
                 </>
               )}
-            <AdsToggle />
-
             <ToggleRow
               title={t("settings.preferences.lowPerformanceModeLabel")}
               description={t(

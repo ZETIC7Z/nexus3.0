@@ -29,6 +29,7 @@ import { AccountActionsPart } from "@/pages/parts/settings/AccountActionsPart";
 import { AccountEditPart } from "@/pages/parts/settings/AccountEditPart";
 import { AppearancePart } from "@/pages/parts/settings/AppearancePart";
 import { CaptionsPart } from "@/pages/parts/settings/CaptionsPart";
+import { AdsPart } from "@/pages/parts/settings/AdsPart";
 import { ConnectionsPart } from "@/pages/parts/settings/ConnectionsPart";
 import { DeviceListPart } from "@/pages/parts/settings/DeviceListPart";
 import { LetterboxdImportPart } from "@/pages/parts/settings/LetterboxdImportPart";
@@ -193,6 +194,7 @@ export function SettingsPage() {
         "settings-appearance",
         "settings-captions",
         "settings-connection",
+        "settings-ads",
         "settings-import",
       ];
 
@@ -244,6 +246,7 @@ export function SettingsPage() {
           "settings-appearance",
           "settings-captions",
           "settings-connection",
+          "settings-ads",
           "settings-import",
         ];
         const subSectionToCategory: Record<string, string> = {
@@ -1204,6 +1207,14 @@ export function SettingsPage() {
               proxyTmdb={state.proxyTmdb.state}
               setProxyTmdb={state.proxyTmdb.set}
             />
+          </div>
+        )}
+
+        {(searchQuery.trim() ||
+          !selectedCategory ||
+          selectedCategory === "settings-ads") && (
+          <div id="settings-ads">
+            <AdsPart />
           </div>
         )}
 
