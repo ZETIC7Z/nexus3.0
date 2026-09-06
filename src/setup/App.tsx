@@ -27,8 +27,9 @@ import { KID_SAFE_GENRES } from "@/utils/media/kidsSearch";
 import { useProfileStore } from "@/stores/profiles";
 import {
   areAdsDisabled,
-  popunderMayLoadThisPage,
+  getClickPopOwner,
   injectAdScriptViaProxy,
+  isAdEligiblePath,
   MONETAG_MARKERS,
   purgeInjectedAds,
   useAdsBlockedSubscription,
@@ -236,69 +237,73 @@ export const maintenanceTime = "March 31th 11:00 PM - 5:00 AM EST";
  * - injects nothing while ads are disabled or a kids profile is active;
  * - purges every ad script from the DOM the moment that state flips
  *   mid-session (Settings toggle works instantly, no reload);
- * - purges when entering a watch page — a popunder firing during playback
- *   is exactly the kind of thing that tanks retention — and restores the
- *   social bar on exit.
+ * - purges when entering any excluded route — especially a watch page —
+ *   so a popunder never fires during playback and account/settings surfaces
+ *   stay clean; eligible browsing routes are restored on exit.
  */
-function AdScriptController({ isWatchPage }: { isWatchPage: boolean }) {
-  const sync = useCallback((blocked: boolean) => {
-    if (blocked)
+function AdScriptController({
+  isWatchPage,
+  isEligible,
+  contextKey,
+}: {
+  isWatchPage: boolean;
+  isEligible: boolean;
+  contextKey: string;
+}) {
+  const [blocked, setBlocked] = useState(() => areAdsDisabled());
+  const sync = useCallback((nextBlocked: boolean) => {
+    setBlocked(nextBlocked);
+    if (nextBlocked) {
       purgeInjectedAds(["popunder", "social-bar", ...MONETAG_MARKERS]);
+    }
   }, []);
   useAdsBlockedSubscription(sync);
 
   useEffect(() => {
-    if (isWatchPage) {
+    if (blocked || !isEligible || isWatchPage) {
       purgeInjectedAds(["popunder", "social-bar", ...MONETAG_MARKERS]);
       return;
     }
-    if (areAdsDisabled()) return;
+
     const { activeProfileId, profiles } = useProfileStore.getState();
     const active = profiles.find((p) => p.id === activeProfileId);
-    if (active?.isKids) return;
-    if (isSocialBarDismissed()) return; // visitor closed the Social Bar this session
-    const cfg = conf();
+    if (active?.isKids) {
+      purgeInjectedAds(["popunder", "social-bar", ...MONETAG_MARKERS]);
+      return;
+    }
 
-    // Social Bar — persistent bottom bar on every non-watch page (deduped,
-    // first-party delivery so adblockers rarely catch it).
-    if (cfg.ENABLE_SOCIAL_BAR && cfg.SOCIAL_BAR_SCRIPT_URL) {
+    const cfg = conf();
+    const monetagClickActive =
+      (cfg.ENABLE_MONETAG_ONCLICK && !!cfg.MONETAG_ONCLICK_URL) ||
+      (cfg.ENABLE_MONETAG_MULTITAG && !!cfg.MONETAG_MULTITAG_URL);
+    const adsterraClickActive =
+      cfg.ENABLE_POPUNDER && !!cfg.POPUNDER_SCRIPT_URL;
+    const owner = getClickPopOwner(
+      contextKey,
+      adsterraClickActive,
+      monetagClickActive,
+    );
+
+    // Route changes can switch the owner. Remove all Monetag surfaces and
+    // the old Popunder, while leaving the independent Social Bar intact.
+    purgeInjectedAds(["popunder", ...MONETAG_MARKERS]);
+
+    if (!isSocialBarDismissed() && cfg.ENABLE_SOCIAL_BAR && cfg.SOCIAL_BAR_SCRIPT_URL) {
       injectAdScriptViaProxy(cfg.SOCIAL_BAR_SCRIPT_URL, "social-bar", {
         socialBar: "1",
       });
     }
 
-    // Popunder — at most once per cooldown, never while watching.
-    // Staggered with the Monetag Onclick zone through the shared click-pop
-    // window so one click never opens two ad tabs.
-    if (!cfg.ENABLE_POPUNDER || !cfg.POPUNDER_SCRIPT_URL) return;
-    if (document.querySelector("script[data-ad-marker='popunder']")) return;
-
-    const monetagOnclickActive =
-      (cfg.ENABLE_MONETAG_ONCLICK &&
-        !!cfg.MONETAG_ONCLICK_URL &&
-        cfg.MONETAG_ONCLICK_URL.trim().length > 8) ||
-      (cfg.ENABLE_MONETAG_MULTITAG &&
-        !!cfg.MONETAG_MULTITAG_URL &&
-        cfg.MONETAG_MULTITAG_URL.trim().length > 8);
-    // Alternation between Adsterra and Monetag is decided at INJECT time
-    // (which network's script may load this page), never by withholding
-    // injection: Adsterra's script applies its own per-user frequency cap,
-    // so the correct behavior is "inject on every eligible page load" —
-    // skipping injection during a cooldown left visitors with NO script at
-    // all, so no click could ever open an ad tab.
     if (
-      !popunderMayLoadThisPage(
-        "adsterra",
-        monetagOnclickActive,
-      )
+      owner === "adsterra" &&
+      adsterraClickActive &&
+      cfg.POPUNDER_SCRIPT_URL
     ) {
-      return; // Monetag owns the click-pop window on this page load
+      injectAdScriptViaProxy(cfg.POPUNDER_SCRIPT_URL, "popunder", {
+        popunder: "1",
+      });
     }
-
-    injectAdScriptViaProxy(cfg.POPUNDER_SCRIPT_URL, "popunder", {
-      popunder: "1",
-    });
-  }, [isWatchPage]);
+  }, [blocked, isEligible, isWatchPage, contextKey]);
 
   return null;
 }
@@ -306,23 +311,34 @@ function AdScriptController({ isWatchPage }: { isWatchPage: boolean }) {
 /**
  * The Social Bar close chip — a tiny floating pill bottom-left with the
  * familiar ✕ advertisement affordance. Closing hides the bar for the rest
- * of the browser session (sessionStorage), so a refresh brings it back and
- * impressions keep counting; the Settings ads toggle still removes it fully.
+ * of the browser session (sessionStorage); a new tab/session can see it
+ * again. The Settings ads toggle still removes it fully.
  *
  * Rendered only while the Social Bar script is active on this page.
  */
-function SocialBarCloseChip({ isWatchPage }: { isWatchPage: boolean }) {
+function SocialBarCloseChip({
+  isWatchPage,
+  isEligible,
+}: {
+  isWatchPage: boolean;
+  isEligible: boolean;
+}) {
   const cfg = conf();
   const socialBarOn = !!cfg.ENABLE_SOCIAL_BAR && !!cfg.SOCIAL_BAR_SCRIPT_URL;
+  const [blocked, setBlocked] = useState(() => areAdsDisabled());
   const [hidden, setHidden] = useState(true);
+  useAdsBlockedSubscription(setBlocked);
 
   useEffect(() => {
-    const update = () => setHidden(isWatchPage || isSocialBarDismissed());
+    const update = () =>
+      setHidden(
+        blocked || !isEligible || isWatchPage || isSocialBarDismissed(),
+      );
     update();
     if (isWatchPage) return;
     const t = setInterval(update, 1000); // cheap poll: dismiss can come from another tab
     return () => clearInterval(t);
-  }, [isWatchPage]);
+  }, [blocked, isEligible, isWatchPage]);
 
   if (!socialBarOn || hidden) return null;
 
@@ -349,7 +365,8 @@ function App() {
   useNotificationInit();
   const location = useLocation();
   const isWatchPage = location.pathname.startsWith("/media/");
-  const isHomePage = location.pathname === "/";
+  const isAdEligible = isAdEligiblePath(location.pathname);
+  const adContextKey = `${isAdEligible ? "eligible" : "blocked"}:${location.pathname}`;
   const maintenance = false; // Shows maintance page
   const [showDowntime, setShowDowntime] = useState(maintenance);
 
@@ -380,9 +397,19 @@ function App() {
 
   return (
     <Layout>
-      <AdScriptController isWatchPage={isWatchPage} />
-      <MonetagAdController isHomePage={isHomePage} />
-      <SocialBarCloseChip isWatchPage={isWatchPage} />
+      <AdScriptController
+        isWatchPage={isWatchPage}
+        isEligible={isAdEligible}
+        contextKey={adContextKey}
+      />
+      <MonetagAdController
+        isEligible={isAdEligible}
+        contextKey={adContextKey}
+      />
+      <SocialBarCloseChip
+        isWatchPage={isWatchPage}
+        isEligible={isAdEligible}
+      />
       <TraktAuthHandler />
       <SimklAuthHandler />
       <LanguageProvider />

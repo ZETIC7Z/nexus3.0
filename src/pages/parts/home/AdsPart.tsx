@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Icon, Icons } from "@/components/Icon";
+import {
+  isAdEligiblePath,
+  useAdsBlocked,
+} from "@/components/ads/helpers";
 import { conf } from "@/setup/config";
-import { useAdsStore } from "@/stores/ads";
 
 function getCookie(name: string): string | null {
   const cookies = document.cookie.split(";");
@@ -22,7 +26,8 @@ function setCookie(name: string, value: string, expiryDays: number): void {
 }
 
 export function AdsPart(): JSX.Element | null {
-  const adsDisabled = useAdsStore((s) => s.adsDisabled);
+  const location = useLocation();
+  const adsBlocked = useAdsBlocked();
   const [isAdDismissed, setIsAdDismissed] = useState(() => {
     return getCookie("adDismissed") === "true";
   });
@@ -32,8 +37,10 @@ export function AdsPart(): JSX.Element | null {
     setCookie("adDismissed", "true", 2); // Expires after 2 days
   }, []);
 
-  // User turned ads off in Settings → Preferences.
-  if (adsDisabled) return null;
+  // User turned ads off in Settings → Preferences or a kids profile is
+  // active. Keep this legacy/custom surface behind the same global gate as
+  // the network scripts and banner slots.
+  if (adsBlocked || !isAdEligiblePath(location.pathname)) return null;
   if (isAdDismissed) return null;
 
   return (
@@ -48,15 +55,17 @@ export function AdsPart(): JSX.Element | null {
 
         const ad1LinkIsValid =
           typeof adContentUrl[1] === "string" && adContentUrl[1].length > 0;
-        const ad1ImageIsProvided = typeof adContentUrl[2] === "string";
+        const ad1ImageIsProvided =
+          typeof adContentUrl[2] === "string" && adContentUrl[2].length > 0;
         const showAd1 =
-          adContentUrl.length >= 2 && ad1LinkIsValid && ad1ImageIsProvided;
+          adContentUrl.length >= 4 && ad1LinkIsValid && ad1ImageIsProvided;
 
         const ad2LinkIsValid =
-          typeof adContentUrl[3] === "string" && adContentUrl[3].length > 0;
-        const ad2ImageIsProvided = typeof adContentUrl[4] === "string";
+          typeof adContentUrl[4] === "string" && adContentUrl[4].length > 0;
+        const ad2ImageIsProvided =
+          typeof adContentUrl[5] === "string" && adContentUrl[5].length > 0;
         const showAd2 =
-          adContentUrl.length >= 5 && ad2LinkIsValid && ad2ImageIsProvided;
+          adContentUrl.length >= 7 && ad2LinkIsValid && ad2ImageIsProvided;
 
         return (
           <>
@@ -123,7 +132,8 @@ export function AdsPart(): JSX.Element | null {
               ) : null}
             </div>
 
-            {adContentUrl[0] !== "null" && (
+            {typeof adContentUrl[0] === "string" &&
+              adContentUrl[0] !== "null" && (
               <div>
                 <p className="text-xs text-type-dimmed text-center pt-2 mx-4">
                   <a

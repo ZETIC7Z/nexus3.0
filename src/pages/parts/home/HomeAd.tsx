@@ -4,10 +4,10 @@ import { useLocation } from "react-router-dom";
 import { Icon, Icons } from "@/components/Icon";
 
 import { conf } from "@/setup/config";
-import { useAdsStore } from "@/stores/ads";
 import {
   loadBannerTag,
-  shouldBlockAds,
+  purgeInjectedAds,
+  useAdsBlocked,
 } from "@/components/ads/helpers";
 
 
@@ -41,15 +41,13 @@ export function dismissSocialBar() {
   } catch {
     /* private mode — bar simply can't be remembered as dismissed */
   }
-  // Purge the live bar immediately.
-  document
-    .querySelectorAll("body > iframe[src], body > ins, body > div[id^='ads']")
-    .forEach((el) => el.remove());
-  const bar = document.querySelector('script[data-ad-marker="social-bar"]');
-  bar?.remove();
+  // Purge the script and any top-level iframe/div the network created.
+  // This also handles the transport iframe some Social Bar versions append
+  // directly under <html> rather than under <body>.
+  purgeInjectedAds(["social-bar"]);
 }
 
-export type AdSlot = "primary" | "secondary" | "bookmarks";
+export type AdSlot = "primary" | "bookmarks";
 
 
 // loadBannerTag now lives in @/components/ads/helpers (shared with the
@@ -234,12 +232,12 @@ function PrimaryGifBanner({ img, href }: { img: string; href: string }) {
 
 export function HomeAd({ slot = "primary" }: { slot?: AdSlot } = {}) {
   const cfg = conf();
-  const adsDisabled = useAdsStore((s) => s.adsDisabled);
+  const adsBlocked = useAdsBlocked();
 
   // User turned ads off in Settings → Preferences (or kids profile active).
   // Return before any slot mounts so the btag script is never injected and
   // banners never render.
-  if (adsDisabled || shouldBlockAds()) return null;
+  if (adsBlocked) return null;
 
   if (slot === "primary") {
     const gifUrl =
@@ -282,14 +280,8 @@ export function HomeAd({ slot = "primary" }: { slot?: AdSlot } = {}) {
     );
   }
 
-  if (!cfg.ENABLE_SECONDARY_AD || !cfg.SECONDARY_AD_ZONE_ID) return null;
-  return (
-    <AdSlotInner
-      cfg={{
-        zoneId: cfg.SECONDARY_AD_ZONE_ID,
-        width: 300,
-        height: 250,
-      }}
-    />
-  );
+  // The former 300×250 homepage/sidebar slot was intentionally removed.
+  // Keep the public API limited to the primary and bookmarks placements so
+  // it cannot be reintroduced accidentally through a stale call site.
+  return null;
 }

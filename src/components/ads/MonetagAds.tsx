@@ -1,9 +1,9 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
+  getClickPopOwner,
   injectAdScript,
   MONETAG_MARKERS,
-  popunderMayLoadThisPage,
   purgeInjectedAds,
   shouldBlockAds,
   useAdsBlockedSubscription,
@@ -11,11 +11,9 @@ import {
 import { conf } from "@/setup/config";
 
 /**
- * Monetag delivery domains (they rotate): scripts from these hosts are
- * rewritten to the same-origin /monetag-serve/ proxy (Vercel rewrite in
- * production, Vite dev proxy locally) so adblockers — which block known
- * ad-network domains but almost never the site's own origin — keep them
- * loading. Any other host falls back to the direct URL.
+ * Monetag rotates delivery domains. Known domains use first-party paths so
+ * Vercel/Vite can proxy the initial script request; unknown rotations use the
+ * direct URL as a safe fallback.
  */
 const MONETAG_SERVE_HOSTS = ["3nbf4.com", "quge5.com"];
 
@@ -27,111 +25,106 @@ function monetagScriptUrl(rawUrl: string): string {
     }
     return rawUrl;
   } catch {
-    return rawUrl; // already a relative path
+    return rawUrl;
   }
 }
 
+function hasUrl(url: string | null): url is string {
+  return !!url && url.trim().length > 8;
+}
+
 /**
- * Monetag ad controller — Onclick, In-Page Push and Vignette Banner.
+ * Monetag controller for eligible browsing routes.
  *
- * Hard rules (mirrors the Adsterra controller):
- * - injects NOTHING when ads are disabled in Settings or a kids profile is
- *   active, and purges everything the moment either flips mid-session;
- * - In-Page Push and Vignette Banner render on the homepage ONLY — purged
- *   on every other route, including the player page;
- * - Onclick is staggered with the Adsterra Popunder through the shared
- *   click-pop window (`claimClickPopSlot`) so a visitor never gets two ad
- *   tabs from one click.
+ * The verified Multitag is Monetag's official all-in-one tag: Onclick, Push
+ * Notifications, In-Page Push, and Vignette Banner. It is loaded only when
+ * Monetag owns the current eligible browsing route's click-pop slot;
+ * Adsterra owns the other route contexts. This prevents two click-pop
+ * scripts from racing on one genuine user click while still giving both
+ * networks eligible traffic.
  *
- * Zone scripts come from the Monetag dashboard ("Get code" → the
- * `.../tag.min.js?zone=...` URL) and live in env vars. Zones without a URL
- * are skipped gracefully, so pasting codes later needs zero code changes.
+ * No hidden click-capture layer or synthetic click is used. Player, account,
+ * settings, profile, kids, onboarding, migration, support, and admin routes
+ * are excluded by App's explicit allowlist.
  */
-export function MonetagAdController({ isHomePage }: { isHomePage: boolean }) {
-  const sync = useCallback((blocked: boolean) => {
-    if (blocked) purgeInjectedAds([...MONETAG_MARKERS]);
+export function MonetagAdController({
+  isEligible,
+  contextKey,
+}: {
+  isEligible: boolean;
+  contextKey: string;
+}) {
+  const [blocked, setBlocked] = useState(() => shouldBlockAds());
+  const sync = useCallback((nextBlocked: boolean) => {
+    setBlocked(nextBlocked);
+    if (nextBlocked) purgeInjectedAds([...MONETAG_MARKERS]);
   }, []);
   useAdsBlockedSubscription(sync);
 
   useEffect(() => {
-    if (!isHomePage) {
-      // Homepage-only surfaces: gone the moment the visitor leaves home
-      // (especially important — never on the player page).
-      purgeInjectedAds([...MONETAG_MARKERS]);
-      return;
-    }
-    if (shouldBlockAds()) {
+    if (blocked || !isEligible || shouldBlockAds()) {
       purgeInjectedAds([...MONETAG_MARKERS]);
       return;
     }
 
     const cfg = conf();
-    const hasUrl = (url: string | null): url is string =>
-      !!url && url.trim().length > 8;
+    const multitagUrl = cfg.MONETAG_MULTITAG_URL;
+    const onclickUrl = cfg.MONETAG_ONCLICK_URL;
+    const inpageUrl = cfg.MONETAG_INPAGE_URL;
+    const vignetteUrl = cfg.MONETAG_VIGNETTE_URL;
+    const adsterraClickActive =
+      cfg.ENABLE_POPUNDER && hasUrl(cfg.POPUNDER_SCRIPT_URL);
+    const multitagActive =
+      cfg.ENABLE_MONETAG_MULTITAG && hasUrl(multitagUrl);
+    const standaloneOnclickActive =
+      cfg.ENABLE_MONETAG_ONCLICK && hasUrl(onclickUrl);
+    const monetagClickActive = multitagActive || standaloneOnclickActive;
+    const owner = getClickPopOwner(
+      contextKey,
+      adsterraClickActive,
+      monetagClickActive,
+    );
 
-    // ── In-Page Push (native-looking notification card above content) ──
-    if (cfg.ENABLE_MONETAG_INPAGE && hasUrl(cfg.MONETAG_INPAGE_URL)) {
-      injectAdScript(monetagScriptUrl(cfg.MONETAG_INPAGE_URL), "monetag-inpage", {
+    purgeInjectedAds([...MONETAG_MARKERS]);
+
+    if (multitagActive && multitagUrl) {
+      if (owner !== "monetag") return;
+      // Monetag requires data-zone to exist before tag.min.js executes.
+      injectAdScript(
+        monetagScriptUrl(multitagUrl),
+        "monetag-multitag",
+        {
+          monetag: "multitag",
+          ...(cfg.MONETAG_MULTITAG_ZONE
+            ? { zone: cfg.MONETAG_MULTITAG_ZONE }
+            : {}),
+        },
+      );
+      return;
+    }
+
+    // Individual zones remain supported when Multitag is not configured.
+    // They do not compete with Adsterra's Popunder unless Onclick is active.
+    if (cfg.ENABLE_MONETAG_INPAGE && hasUrl(inpageUrl)) {
+      injectAdScript(monetagScriptUrl(inpageUrl), "monetag-inpage", {
         monetag: "inpage",
       });
     }
-
-    // ── Vignette Banner (full-screen rich-media overlay on click/exit) ──
-    if (cfg.ENABLE_MONETAG_VIGNETTE && hasUrl(cfg.MONETAG_VIGNETTE_URL)) {
+    if (cfg.ENABLE_MONETAG_VIGNETTE && hasUrl(vignetteUrl)) {
       injectAdScript(
-        monetagScriptUrl(cfg.MONETAG_VIGNETTE_URL),
+        monetagScriptUrl(vignetteUrl),
         "monetag-vignette",
         { monetag: "vignette" },
       );
     }
-
-    // ── Multitag (one script, auto-runs Onclick + In-Page Push + Vignette
-    // per visitor; the dashboard's recommended format) ──
-    // Homepage-only and staggered with the Adsterra Popunder through the
-    // shared click-pop window: Multitag includes a popunder-style format,
-    // so loading it on every page alongside Adsterra's popunder could open
-    // TWO ad tabs from one click. When Adsterra wins this page load, no
-    // Monetag script runs at all; they alternate page by page.
-    if (cfg.ENABLE_MONETAG_MULTITAG && hasUrl(cfg.MONETAG_MULTITAG_URL)) {
-      const adsterraPopunderActive =
-        cfg.ENABLE_POPUNDER && hasUrl(cfg.POPUNDER_SCRIPT_URL);
-      if (popunderMayLoadThisPage("monetag", adsterraPopunderActive)) {
-        // Multitag's code requires its zone id on the script before it is
-        // appended, so pass it through the injector's pre-append attributes.
-        injectAdScript(
-          monetagScriptUrl(cfg.MONETAG_MULTITAG_URL),
-          "monetag-multitag",
-          {
-            monetag: "multitag",
-            ...(cfg.MONETAG_MULTITAG_ZONE
-              ? { zone: cfg.MONETAG_MULTITAG_ZONE }
-              : {}),
-          },
-        );
-      }
+    if (standaloneOnclickActive && onclickUrl && owner === "monetag") {
+      injectAdScript(
+        monetagScriptUrl(onclickUrl),
+        "monetag-onclick",
+        { monetag: "onclick" },
+      );
     }
-
-    // ── Onclick (standalone popunder-equivalent; staggered with Adsterra) ──
-    // Only used when NO Multitag zone is configured (Multitag already
-    // contains the Onclick format — running both would double-fire).
-    if (
-      cfg.ENABLE_MONETAG_ONCLICK &&
-      hasUrl(cfg.MONETAG_ONCLICK_URL) &&
-      !(cfg.ENABLE_MONETAG_MULTITAG && hasUrl(cfg.MONETAG_MULTITAG_URL))
-    ) {
-      const adsterraPopunderActive =
-        cfg.ENABLE_POPUNDER && hasUrl(cfg.POPUNDER_SCRIPT_URL);
-      if (
-        popunderMayLoadThisPage("monetag", adsterraPopunderActive)
-      ) {
-        injectAdScript(
-          monetagScriptUrl(cfg.MONETAG_ONCLICK_URL),
-          "monetag-onclick",
-          { monetag: "onclick" },
-        );
-      }
-    }
-  }, [isHomePage]);
+  }, [blocked, contextKey, isEligible]);
 
   return null;
 }

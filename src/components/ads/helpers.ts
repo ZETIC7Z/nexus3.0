@@ -31,6 +31,23 @@ export function shouldBlockAds(): boolean {
 }
 
 /**
+ * Reactive version of `shouldBlockAds()` for components that render visible
+ * ad markup. This keeps banners in sync when the active profile changes
+ * without a route change.
+ */
+export function useAdsBlocked(): boolean {
+  const adsDisabled = useAdsStore((state) => state.adsDisabled);
+  const isKids = useProfileStore((state) => {
+    if (!state.activeProfileId) return false;
+    const active = state.profiles.find(
+      (profile) => profile.id === state.activeProfileId,
+    );
+    return !!active?.isKids;
+  });
+  return adsDisabled || isKids;
+}
+
+/**
  * Subscribe to ad-preference changes for the lifetime of the page.
  * `onChange` fires immediately with the current blocked state and again
  * whenever the ads-disabled flag flips. Use it to purge/unpurge scripts
@@ -48,18 +65,104 @@ export function useAdsBlockedSubscription(onChange: (blocked: boolean) => void) 
     };
     check();
     // The ads store is persisted to localStorage; storage events catch
-    // changes from other tabs, zustand subscribe catches same-tab flips.
+    // changes from other tabs, zustand subscriptions catch same-tab flips.
     const unsub = useAdsStore.subscribe(check);
+    const profileUnsub = useProfileStore.subscribe(check);
     let onStorage: ((e: StorageEvent) => void) | null = (e) => {
       if (e.key === "__MW::ads") check();
     };
     window.addEventListener("storage", onStorage);
     return () => {
       unsub();
+      profileUnsub();
       if (onStorage) window.removeEventListener("storage", onStorage);
       onStorage = null;
     };
   }, [onChange]);
+}
+
+const adArtifactObservers = new Map<string, MutationObserver>();
+const adArtifactHints = new Map<string, string[]>();
+
+function getAdArtifactHints(sourceHint: string): string[] {
+  return Array.from(
+    new Set(
+      sourceHint.toLowerCase().match(/[a-z0-9]{8,}/g) ?? [],
+    ),
+  );
+}
+
+/**
+ * Track top-level nodes created by a network script. Popunder, Social Bar,
+ * and Vignette formats commonly append their own iframe/div outside React's
+ * root, so removing only the script tag would leave an overlay behind on a
+ * route change. The observer watches both <body> and direct <html> children;
+ * it marks only nodes that look like the requesting network's artifact, never
+ * React descendants.
+ */
+function watchAdArtifacts(marker: string, sourceHint = ""): void {
+  if (typeof document === "undefined" || !document.documentElement) return;
+  if (sourceHint) adArtifactHints.set(marker, getAdArtifactHints(sourceHint));
+  if (adArtifactObservers.has(marker)) return;
+
+  const isArtifactForMarker = (element: HTMLElement): boolean => {
+    const identity = `${element.id} ${
+      typeof element.className === "string" ? element.className : ""
+    }`.toLowerCase();
+    const markup = element.outerHTML.slice(0, 12000).toLowerCase();
+    const hints = adArtifactHints.get(marker) ?? [];
+    if (hints.some((hint) => markup.includes(hint))) return true;
+
+    // Social Bar's top-level transport iframe uses this stable prefix.
+    if (marker === "social-bar" && /(^|[-_])container[-_]/.test(identity)) {
+      return true;
+    }
+
+    // Adsterra's click-pop trigger is a nearly transparent, full-screen,
+    // highest-z-index element (the network creates it, not this app).
+    if (marker === "popunder") {
+      const style = element.style;
+      const zIndex = Number.parseInt(style.zIndex || "0", 10);
+      const rect = element.getBoundingClientRect();
+      const fullScreen =
+        rect.width >= window.innerWidth * 0.9 &&
+        rect.height >= window.innerHeight * 0.9;
+      return style.position === "fixed" && zIndex >= 2147483646 && fullScreen;
+    }
+
+    // Monetag may rotate its container names, so its delivery host or zone
+    // identifier is the safest marker when it appears in the generated DOM.
+    if (marker.startsWith("monetag-")) {
+      return /quge5|3nbf4|277030/.test(markup);
+    }
+
+    return false;
+  };
+
+  const mark = (node: Node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const element = node as HTMLElement;
+    const parent = element.parentElement;
+    if (
+      (parent !== document.body && parent !== document.documentElement) ||
+      element === document.head ||
+      element === document.body ||
+      element.id === "root"
+    ) {
+      return;
+    }
+    if (isArtifactForMarker(element)) {
+      element.dataset.nexusAdArtifact = marker;
+    }
+  };
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach(mark);
+    });
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  adArtifactObservers.set(marker, observer);
 }
 
 /**
@@ -74,6 +177,7 @@ export function injectAdScript(
 ): HTMLScriptElement | null {
   if (typeof document === "undefined") return null;
   if (shouldBlockAds()) return null;
+  watchAdArtifacts(marker, `${src} ${JSON.stringify(attrs)}`);
   const existing = document.querySelector(`script[data-ad-marker="${marker}"]`);
   if (existing) return existing as HTMLScriptElement;
 
@@ -101,7 +205,7 @@ export function loadBannerTag(
   width: number,
   height: number,
 ) {
-  if (typeof window === "undefined" || !zoneId) return;
+  if (typeof window === "undefined" || !zoneId || shouldBlockAds()) return;
   const dedupeId = `btag-${zoneId}`;
   if (document.getElementById(dedupeId)) return;
   const s = document.createElement("script");
@@ -141,12 +245,14 @@ export function injectAdScriptViaProxy(
 
   let pathname = scriptUrl;
   try {
-    pathname = new URL(scriptUrl).pathname;
+    const url = new URL(scriptUrl);
+    pathname = `${url.pathname}${url.search}`;
   } catch {
     /* not an absolute URL — treat as path already */
   }
 
   const proxySrc = `/ads-serve${pathname}`;
+  watchAdArtifacts(marker, `${scriptUrl} ${JSON.stringify(attrs)}`);
   const appendDirectFallback = () => {
     if (document.querySelector(`script[data-ad-fallback="${marker}"]`)) return;
     const fb = document.createElement("script");
@@ -206,56 +312,103 @@ export function purgeInjectedAds(markers: string[] = ["popunder", "social-bar"])
     document
       .querySelectorAll(`script[data-ad-marker="${marker}"]`)
       .forEach((el) => el.remove());
+    document
+      .querySelectorAll(`[data-nexus-ad-artifact="${marker}"]`)
+      .forEach((el) => el.remove());
+    adArtifactObservers.get(marker)?.disconnect();
+    adArtifactObservers.delete(marker);
+    adArtifactHints.delete(marker);
   });
   // Adsterra Social Bar renders itself inside an iframe appended to <body>
-  // (id like "ads-fr" / container divs). Nuke any iframe that lives directly
-  // under body — the app itself never creates those.
-  document
-    .querySelectorAll("body > iframe[src], body > ins, body > div[id^='ads']")
-    .forEach((el) => el.remove());
+  // (id like "ads-fr" / container divs). Only remove those artifacts when
+  // the Social Bar marker is being purged; changing click-pop owners must
+  // not remove a still-eligible Social Bar.
+  if (markers.includes("social-bar")) {
+    document
+      .querySelectorAll(          "body > iframe[src], body > iframe[id^='container-'], " +
+          "body > iframe[class^='container-'], body > ins, body > div[id^='ads'], " +
+          "html > iframe[id^='container-'], html > div[id^='container-'], " +
+
+          "html > ins[id^='container-']",
+      )
+      .forEach((el) => el.remove());
+  }
 }
 
-// ── Click-pop coordination (Adsterra Popunder ↔ Monetag Onclick) ───────
-// Both networks sell the same format (first click opens an ad tab). Running
-// them uncoordinated can open TWO ad tabs from a single click, which reads
-// as a popunder attack and tanks retention. Instead exactly ONE network's
-// script loads per page load (alternating), so only one pop is ever armed.
+/**
+ * Routes where advertising is appropriate. Keep this allowlist explicit so
+ * player, account, settings, profile, kids, onboarding, migration, support,
+ * and admin surfaces never start ad scripts accidentally.
+ */
+export function isAdEligiblePath(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/browse" ||
+    pathname.startsWith("/browse/") ||
+    pathname === "/search" ||
+    pathname.startsWith("/search/") ||
+    pathname === "/s" ||
+    pathname.startsWith("/s/") ||
+    pathname === "/discover" ||
+    pathname.startsWith("/discover/") ||
+    pathname === "/bookmarks" ||
+    pathname === "/history" ||
+    pathname === "/watch-history" ||
+    pathname === "/algorithm" ||
+    pathname.startsWith("/person/")
+  );
+}
 
-const CLICK_POP_NET_KEY = "__pu_net";
+// ── Click-pop coordination (Adsterra Popunder ↔ Monetag Multitag) ─────
+// Both networks sell a click-pop format. Loading both on the same route can
+// open two tabs from one user click, so exactly one network owns each
+// eligible browsing context. The network itself still controls its frequency
+// cap and whether the browser accepts the popup.
+const CLICK_POP_NET_KEY = "__nexus_click_pop_net";
 
 export type ClickPopNetwork = "adsterra" | "monetag";
 
-/**
- * Which network's click-pop script loads on THIS page load. Alternates on
- * every new page load (SPA navigations included) so both networks earn over
- * a session, and memoized so the Adsterra and Monetag controllers can never
- * disagree within one load. Each network's own script still applies its own
- * per-user frequency cap — this only decides who is ARMED, never frequency.
- */
+let clickPopContextKey: string | null = null;
 let clickPopOwner: ClickPopNetwork | null = null;
 
-export function popunderMayLoadThisPage(
-  net: ClickPopNetwork,
-  otherConfigured: boolean,
-): boolean {
-  if (clickPopOwner) return clickPopOwner === net;
-  if (!otherConfigured) {
-    clickPopOwner = net;
-    return true;
+/**
+ * Returns the single click-pop owner for a route context. The result is
+ * memoized so Adsterra and Monetag controllers agree during one render, then
+ * alternates across route changes/reloads when both networks are configured.
+ */
+export function getClickPopOwner(
+  contextKey: string,
+  adsterraConfigured: boolean,
+  monetagConfigured: boolean,
+): ClickPopNetwork | null {
+  if (!adsterraConfigured && !monetagConfigured) {
+    clickPopContextKey = contextKey;
+    clickPopOwner = null;
+    return null;
   }
-  let lastNet: string | null = null;
-  try {
-    lastNet = sessionStorage.getItem(CLICK_POP_NET_KEY);
-  } catch {
-    /* private mode — just alternate in-memory */
+  if (clickPopContextKey === contextKey) return clickPopOwner;
+
+  if (!adsterraConfigured) {
+    clickPopOwner = "monetag";
+  } else if (!monetagConfigured) {
+    clickPopOwner = "adsterra";
+  } else {
+    let lastNet: string | null = null;
+    try {
+      lastNet = sessionStorage.getItem(CLICK_POP_NET_KEY);
+    } catch {
+      /* private mode — default to Adsterra */
+    }
+    clickPopOwner = lastNet === "adsterra" ? "monetag" : "adsterra";
+    try {
+      sessionStorage.setItem(CLICK_POP_NET_KEY, clickPopOwner);
+    } catch {
+      /* ignore */
+    }
   }
-  clickPopOwner = lastNet === "adsterra" ? "monetag" : "adsterra";
-  try {
-    sessionStorage.setItem(CLICK_POP_NET_KEY, clickPopOwner);
-  } catch {
-    /* ignore */
-  }
-  return clickPopOwner === net;
+
+  clickPopContextKey = contextKey;
+  return clickPopOwner;
 }
 
 /** All Monetag script markers, for purging. */

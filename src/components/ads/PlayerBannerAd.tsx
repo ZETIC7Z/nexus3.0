@@ -3,9 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon, Icons } from "@/components/Icon";
 
 import { conf } from "@/setup/config";
-import { useAdsStore } from "@/stores/ads";
 
-import { loadBannerTag, shouldBlockAds } from "./helpers";
+import { loadBannerTag, useAdsBlocked } from "./helpers";
 
 const BANNER_W = 468;
 const BANNER_H = 60;
@@ -37,7 +36,7 @@ function readDismissed(): boolean {
  *   slot stays dormant until you paste your Adsterra zone code values.
  */
 export function PlayerBannerAd() {
-  const adsDisabled = useAdsStore((s) => s.adsDisabled);
+  const adsBlocked = useAdsBlocked();
   const cfg = conf();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [adState, setAdState] = useState<"loading" | "loaded" | "failed">(
@@ -60,7 +59,7 @@ export function PlayerBannerAd() {
     }
   }, []);
 
-  const blocked = adsDisabled || shouldBlockAds();
+  const blocked = adsBlocked;
 
   useEffect(() => {
     if (blocked || dismissed || !configured) return;

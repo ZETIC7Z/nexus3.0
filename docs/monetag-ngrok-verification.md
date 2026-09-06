@@ -1,7 +1,8 @@
 # Monetag verification — local testing with ngrok
 
-Monetag unlocks your 3 zone codes (Onclick, In-Page Push, Vignette Banner)
-after it can crawl your site and find the verification marker. This guide
+Monetag unlocks your zone codes after it can crawl your site and find the
+verification marker. A verified Multitag can provide Onclick, Push
+Notifications, In-Page Push, and Vignette Banner from one official tag. This guide
 gets you there from the local dev server.
 
 ## How Monetag verification actually works (important)
@@ -108,21 +109,28 @@ Press **Verify** on the website page. Two outcomes:
   ready — nothing is pushed for you) and press Verify again; both markers
   go live with the build.
 
-### 7. After verification: get the 3 zone URLs
+### 7. After verification: install one Multitag or separate zones
 
-Monetag dashboard → create zones **Onclick**, **In-Page Push**, and
-**Vignette Banner** (skip Push Notifications) → each zone → **Get code** →
-copy only the `<script src="..."></script>` **URL** (the part inside
-`src="..."`) and paste into `.env.local`:
+Recommended: create one **Multitag** in Monetag, copy its full script and
+record both values:
 
-```bash
-VITE_MONETAG_ONCLICK_URL=https://<monetag-domain>/.../tag.min.js?zone=XXXXX
-VITE_MONETAG_INPAGE_URL=https://<monetag-domain>/.../tag.min.js?zone=XXXXX
-VITE_MONETAG_VIGNETTE_URL=https://<monetag-domain>/.../tag.min.js?zone=XXXXX
+```html
+<script src="https://<monetag-domain>/.../tag.min.js" data-zone="XXXXX" async data-cfasync="false"></script>
 ```
 
-Restart the dev server — the zones go live on the homepage only, staggered
-with the Adsterra popunder, never on the player page.
+Set the script URL and zone in `.env.local`:
+
+```bash
+VITE_ENABLE_MONETAG_MULTITAG=true
+VITE_MONETAG_MULTITAG_URL=https://<monetag-domain>/.../tag.min.js
+VITE_MONETAG_MULTITAG_ZONE=XXXXX
+```
+
+A Multitag supplies Onclick, Push Notifications, In-Page Push, and Vignette.
+Do not add duplicate individual zones on top of it. If Monetag instead gives
+you separate formats, leave Multitag empty and set the individual zone URLs.
+Restart the dev server; the controller runs on eligible browsing pages and
+never on the player.
 
 ## Mirroring to production later
 

@@ -223,9 +223,10 @@ export default defineConfig(({ mode }) => {
     },
 
     server: {
-      // ngrok support: tunnel requests arrive with an *.ngrok-free.app Host
-      // header; without an allowlist Vite's dev host-check rejects them with
-      // "Invalid Host Header" and Monetag verification can never see the site.
+      // Bind beyond loopback so an HTTPS tunnel (for example ngrok) can reach
+      // the local site. The explicit suffix allowlist keeps Vite's host check
+      // enabled for normal development traffic.
+      host: true,
       allowedHosts: [".ngrok-free.app", ".ngrok.io", ".ngrok.dev"],
       proxy: {
 

@@ -355,9 +355,9 @@ export function conf(): RuntimeConfig {
     ENABLE_PLAYER_BANNER: getKey("ENABLE_PLAYER_BANNER", "false") === "true",
     PLAYER_BANNER_ZONE_ID: getKey("PLAYER_BANNER_ZONE_ID"),
     PLAYER_BANNER_INVOKE_KEY: getKey("PLAYER_BANNER_INVOKE_KEY"),
-    // Monetag (Onclick + In-Page Push + Vignette Banner — homepage only,
-    // no Push Notifications). Zone scripts are pasted into the env when the
-    // publisher creates them in the Monetag dashboard.
+    // Monetag Multitag / individual zones. Multitag includes Onclick, Push
+    // Notifications, In-Page Push, and Vignette; the controller limits it to
+    // eligible browsing routes and never loads it on the player.
     ENABLE_MONETAG_ONCLICK:
       getKey("ENABLE_MONETAG_ONCLICK", "false") === "true",
     MONETAG_ONCLICK_URL: getKey("MONETAG_ONCLICK_URL"),

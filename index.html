@@ -1,40 +1,10 @@
 <!doctype html>
 <html lang="en" dir="ltr">
 <head>
-<script>
-(function () {
-  window.__zsPopupAllow = false;
-  function guardWindow(win) {
-    var openOnThis = win.open;
-    if (typeof openOnThis !== "function") return;
-    openOnThis = openOnThis.bind(win);
-    var guarded = function () {
-      if (window.__zsPopupAllow) return openOnThis.apply(null, arguments);
-      return null;
-    };
-    try {
-      Object.defineProperty(win, "open", { value: guarded, writable: false, configurable: false });
-    } catch (e) {
-      try { win.open = guarded; } catch (e2) {}
-    }
-  }
-  guardWindow(window);
-  function guardIframe(iframe) {
-    function apply() { if (iframe.contentWindow) guardWindow(iframe.contentWindow); }
-    apply();
-    iframe.addEventListener("load", apply);
-  }
-  document.querySelectorAll("iframe").forEach(guardIframe);
-  new MutationObserver(function (mutations) {
-    mutations.forEach(function (m) {
-      m.addedNodes.forEach(function (node) {
-        if (node.tagName === "IFRAME") { guardIframe(node); }
-        else if (node.querySelectorAll) { node.querySelectorAll("iframe").forEach(guardIframe); }
-      });
-    });
-  }).observe(document.documentElement, { childList: true, subtree: true });
-})();
-</script>
+<!-- Do not globally override window.open here: ad-network scripts need the
+     browser's genuine user gesture to decide whether a frequency-capped
+     popunder is allowed. The app-level popup guard only excludes ad scripts
+     from the player route. -->
 
 <meta charset="utf-8" />
 
