@@ -274,9 +274,12 @@ function AdScriptController({ isWatchPage }: { isWatchPage: boolean }) {
     if (document.querySelector("script[data-ad-marker='popunder']")) return;
 
     const monetagOnclickActive =
-      cfg.ENABLE_MONETAG_ONCLICK &&
-      !!cfg.MONETAG_ONCLICK_URL &&
-      cfg.MONETAG_ONCLICK_URL.trim().length > 8;
+      (cfg.ENABLE_MONETAG_ONCLICK &&
+        !!cfg.MONETAG_ONCLICK_URL &&
+        cfg.MONETAG_ONCLICK_URL.trim().length > 8) ||
+      (cfg.ENABLE_MONETAG_MULTITAG &&
+        !!cfg.MONETAG_MULTITAG_URL &&
+        cfg.MONETAG_MULTITAG_URL.trim().length > 8);
     // Alternation between Adsterra and Monetag is decided at INJECT time
     // (which network's script may load this page), never by withholding
     // injection: Adsterra's script applies its own per-user frequency cap,

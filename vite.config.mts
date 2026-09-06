@@ -241,6 +241,12 @@ export default defineConfig(({ mode }) => {
         },
 
         // ── Monetag — first-party delivery (anti-adblock) ──────────
+        "/monetag-serve/88": {
+          target: "https://quge5.com",
+          changeOrigin: true,
+          secure: true,
+          rewrite: (p) => p.replace(/^\/monetag-serve/, ""),
+        },
         "/monetag-serve": {
           target: "https://3nbf4.com",
           changeOrigin: true,

@@ -236,4 +236,5 @@ export const MONETAG_MARKERS = [
   "monetag-onclick",
   "monetag-inpage",
   "monetag-vignette",
+  "monetag-multitag",
 ] as const;

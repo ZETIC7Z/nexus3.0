@@ -11,19 +11,18 @@ import {
 import { conf } from "@/setup/config";
 
 /**
- * The Monetag delivery domain from the account's sw.js (3nbf4.com). Scripts
- * served from it are rewritten to the same-origin /monetag-serve/ proxy
- * (nginx in production, Vite dev proxy locally) so adblockers — which block
- * known ad-network domains but almost never the site's own origin — keep
- * them loading. Any other host (Monetag sometimes rotates domains) falls
- * back to the direct URL.
+ * Monetag delivery domains (they rotate): scripts from these hosts are
+ * rewritten to the same-origin /monetag-serve/ proxy (Vercel rewrite in
+ * production, Vite dev proxy locally) so adblockers — which block known
+ * ad-network domains but almost never the site's own origin — keep them
+ * loading. Any other host falls back to the direct URL.
  */
-const MONETAG_SERVE_HOST = "3nbf4.com";
+const MONETAG_SERVE_HOSTS = ["3nbf4.com", "quge5.com"];
 
 function monetagScriptUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
-    if (url.hostname === MONETAG_SERVE_HOST) {
+    if (MONETAG_SERVE_HOSTS.includes(url.hostname)) {
       return `/monetag-serve${url.pathname}${url.search}`;
     }
     return rawUrl;
@@ -86,8 +85,37 @@ export function MonetagAdController({ isHomePage }: { isHomePage: boolean }) {
       );
     }
 
-    // ── Onclick (popunder-equivalent; staggered with Adsterra) ──
-    if (cfg.ENABLE_MONETAG_ONCLICK && hasUrl(cfg.MONETAG_ONCLICK_URL)) {
+    // ── Multitag (one script, auto-runs Onclick + In-Page Push + Vignette
+    // per visitor; the dashboard's recommended format) ──
+    // Homepage-only and staggered with the Adsterra Popunder through the
+    // shared click-pop window: Multitag includes a popunder-style format,
+    // so loading it on every page alongside Adsterra's popunder could open
+    // TWO ad tabs from one click. When Adsterra wins this page load, no
+    // Monetag script runs at all; they alternate page by page.
+    if (cfg.ENABLE_MONETAG_MULTITAG && hasUrl(cfg.MONETAG_MULTITAG_URL)) {
+      const adsterraPopunderActive =
+        cfg.ENABLE_POPUNDER && hasUrl(cfg.POPUNDER_SCRIPT_URL);
+      if (popunderMayLoadThisPage("monetag", adsterraPopunderActive)) {
+        const s = injectAdScript(
+          monetagScriptUrl(cfg.MONETAG_MULTITAG_URL),
+          "monetag-multitag",
+          { monetag: "multitag" },
+        );
+        // Multitag's code requires its zone id as a data attribute.
+        if (s && cfg.MONETAG_MULTITAG_ZONE) {
+          s.setAttribute("data-zone", cfg.MONETAG_MULTITAG_ZONE);
+        }
+      }
+    }
+
+    // ── Onclick (standalone popunder-equivalent; staggered with Adsterra) ──
+    // Only used when NO Multitag zone is configured (Multitag already
+    // contains the Onclick format — running both would double-fire).
+    if (
+      cfg.ENABLE_MONETAG_ONCLICK &&
+      hasUrl(cfg.MONETAG_ONCLICK_URL) &&
+      !(cfg.ENABLE_MONETAG_MULTITAG && hasUrl(cfg.MONETAG_MULTITAG_URL))
+    ) {
       const adsterraPopunderActive =
         cfg.ENABLE_POPUNDER && hasUrl(cfg.POPUNDER_SCRIPT_URL);
       if (

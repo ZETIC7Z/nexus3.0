@@ -8,6 +8,10 @@
       "destination": "https://pimplehardnesscarnivorous.com/:path*"
     },
     {
+      "source": "/monetag-serve/88/:path*",
+      "destination": "https://quge5.com/88/:path*"
+    },
+    {
       "source": "/monetag-serve/:path*",
       "destination": "https://3nbf4.com/:path*"
     },

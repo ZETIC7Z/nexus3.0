@@ -75,6 +75,9 @@ interface Config {
   MONETAG_INPAGE_URL: string;
   ENABLE_MONETAG_VIGNETTE: boolean;
   MONETAG_VIGNETTE_URL: string;
+  ENABLE_MONETAG_MULTITAG: boolean;
+  MONETAG_MULTITAG_URL: string;
+  MONETAG_MULTITAG_ZONE: string;
 }
 
 export interface RuntimeConfig {
@@ -146,6 +149,9 @@ export interface RuntimeConfig {
   MONETAG_INPAGE_URL: string | null;
   ENABLE_MONETAG_VIGNETTE: boolean;
   MONETAG_VIGNETTE_URL: string | null;
+  ENABLE_MONETAG_MULTITAG: boolean;
+  MONETAG_MULTITAG_URL: string | null;
+  MONETAG_MULTITAG_ZONE: string | null;
 }
 
 const env: Record<keyof Config, undefined | string> = {
@@ -219,6 +225,9 @@ const env: Record<keyof Config, undefined | string> = {
   MONETAG_INPAGE_URL: import.meta.env.VITE_MONETAG_INPAGE_URL,
   ENABLE_MONETAG_VIGNETTE: import.meta.env.VITE_ENABLE_MONETAG_VIGNETTE,
   MONETAG_VIGNETTE_URL: import.meta.env.VITE_MONETAG_VIGNETTE_URL,
+  ENABLE_MONETAG_MULTITAG: import.meta.env.VITE_ENABLE_MONETAG_MULTITAG,
+  MONETAG_MULTITAG_URL: import.meta.env.VITE_MONETAG_MULTITAG_URL,
+  MONETAG_MULTITAG_ZONE: import.meta.env.VITE_MONETAG_MULTITAG_ZONE,
 };
 
 function coerceUndefined(value: string | null | undefined): string | undefined {
@@ -358,5 +367,9 @@ export function conf(): RuntimeConfig {
     ENABLE_MONETAG_VIGNETTE:
       getKey("ENABLE_MONETAG_VIGNETTE", "false") === "true",
     MONETAG_VIGNETTE_URL: getKey("MONETAG_VIGNETTE_URL"),
+    ENABLE_MONETAG_MULTITAG:
+      getKey("ENABLE_MONETAG_MULTITAG", "false") === "true",
+    MONETAG_MULTITAG_URL: getKey("MONETAG_MULTITAG_URL"),
+    MONETAG_MULTITAG_ZONE: getKey("MONETAG_MULTITAG_ZONE"),
   };
 }
