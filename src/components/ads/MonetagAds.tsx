@@ -96,15 +96,18 @@ export function MonetagAdController({ isHomePage }: { isHomePage: boolean }) {
       const adsterraPopunderActive =
         cfg.ENABLE_POPUNDER && hasUrl(cfg.POPUNDER_SCRIPT_URL);
       if (popunderMayLoadThisPage("monetag", adsterraPopunderActive)) {
-        const s = injectAdScript(
+        // Multitag's code requires its zone id on the script before it is
+        // appended, so pass it through the injector's pre-append attributes.
+        injectAdScript(
           monetagScriptUrl(cfg.MONETAG_MULTITAG_URL),
           "monetag-multitag",
-          { monetag: "multitag" },
+          {
+            monetag: "multitag",
+            ...(cfg.MONETAG_MULTITAG_ZONE
+              ? { zone: cfg.MONETAG_MULTITAG_ZONE }
+              : {}),
+          },
         );
-        // Multitag's code requires its zone id as a data attribute.
-        if (s && cfg.MONETAG_MULTITAG_ZONE) {
-          s.setAttribute("data-zone", cfg.MONETAG_MULTITAG_ZONE);
-        }
       }
     }
 
