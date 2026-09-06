@@ -86,6 +86,10 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         disable: env.VITE_PWA_ENABLED !== "true",
         registerType: "autoUpdate",
+        // Monetag's domain-verification service worker ships as public/sw.js
+        // and MUST be served at /sw.js — the PWA worker lives at /app-sw.js
+        // so the build never overwrites it.
+        filename: "app-sw.js",
         workbox: {
           maximumFileSizeToCacheInBytes: 4000000, // 4mb
           // Heavy on-demand chunks (voice AI, translation DB, locale packs)
@@ -219,7 +223,30 @@ export default defineConfig(({ mode }) => {
     },
 
     server: {
+      // ngrok support: tunnel requests arrive with an *.ngrok-free.app Host
+      // header; without an allowlist Vite's dev host-check rejects them with
+      // "Invalid Host Header" and Monetag verification can never see the site.
+      allowedHosts: [".ngrok-free.app", ".ngrok.io", ".ngrok.dev"],
       proxy: {
+
+        // ── Ad scripts — first-party delivery (anti-adblock) ──────────
+        // Adsterra scripts are fetched same-origin (/ads-serve/...) and
+        // proxied server-side. Adblockers block known ad-network domains,
+        // but almost never first-party paths on the site's own origin.
+        "/ads-serve": {
+          target: "https://pimplehardnesscarnivorous.com",
+          changeOrigin: true,
+          secure: true,
+          rewrite: (p) => p.replace(/^\/ads-serve/, ""),
+        },
+
+        // ── Monetag — first-party delivery (anti-adblock) ──────────
+        "/monetag-serve": {
+          target: "https://3nbf4.com",
+          changeOrigin: true,
+          secure: true,
+          rewrite: (p) => p.replace(/^\/monetag-serve/, ""),
+        },
 
         // ── TMDB — metadata (server-side key, same-origin browser request) ─
         "/api/tmdb": {

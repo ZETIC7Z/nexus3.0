@@ -212,8 +212,13 @@ function MigrationRunner() {
     changeAppLanguage(useLanguageStore.getState().language);
     await initializeOldStores();
 
-    const region = await detectRegion();
-    useRegionStore.getState().setRegion(region);
+    // Region detection used to AWAIT here, blocking the whole app behind
+    // the "Loading your profile" screen while ipapi.co (slow, often
+    // rate-limited) responded. It only powers regional content picks, so
+    // run it in the background and apply whenever it lands.
+    detectRegion()
+      .then((region) => useRegionStore.getState().setRegion(region))
+      .catch(() => {});
   }, []);
   const { t } = useTranslation();
 

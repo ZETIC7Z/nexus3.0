@@ -62,6 +62,19 @@ interface Config {
   ENABLE_POPUNDER: boolean;
   POPUNDER_SCRIPT_URL: string;
   POPUNDER_COOLDOWN_HOURS: string;
+  ENABLE_SOCIAL_BAR: boolean;
+  SOCIAL_BAR_SCRIPT_URL: string;
+  ENABLE_SMARTLINK: boolean;
+  SMARTLINK_URL: string;
+  ENABLE_PLAYER_BANNER: boolean;
+  PLAYER_BANNER_ZONE_ID: string;
+  PLAYER_BANNER_INVOKE_KEY: string;
+  ENABLE_MONETAG_ONCLICK: boolean;
+  MONETAG_ONCLICK_URL: string;
+  ENABLE_MONETAG_INPAGE: boolean;
+  MONETAG_INPAGE_URL: string;
+  ENABLE_MONETAG_VIGNETTE: boolean;
+  MONETAG_VIGNETTE_URL: string;
 }
 
 export interface RuntimeConfig {
@@ -120,6 +133,19 @@ export interface RuntimeConfig {
   ENABLE_POPUNDER: boolean;
   POPUNDER_SCRIPT_URL: string | null;
   POPUNDER_COOLDOWN_HOURS: string | null;
+  ENABLE_SOCIAL_BAR: boolean;
+  SOCIAL_BAR_SCRIPT_URL: string | null;
+  ENABLE_SMARTLINK: boolean;
+  SMARTLINK_URL: string | null;
+  ENABLE_PLAYER_BANNER: boolean;
+  PLAYER_BANNER_ZONE_ID: string | null;
+  PLAYER_BANNER_INVOKE_KEY: string | null;
+  ENABLE_MONETAG_ONCLICK: boolean;
+  MONETAG_ONCLICK_URL: string | null;
+  ENABLE_MONETAG_INPAGE: boolean;
+  MONETAG_INPAGE_URL: string | null;
+  ENABLE_MONETAG_VIGNETTE: boolean;
+  MONETAG_VIGNETTE_URL: string | null;
 }
 
 const env: Record<keyof Config, undefined | string> = {
@@ -180,6 +206,19 @@ const env: Record<keyof Config, undefined | string> = {
   ENABLE_POPUNDER: import.meta.env.VITE_ENABLE_POPUNDER,
   POPUNDER_SCRIPT_URL: import.meta.env.VITE_POPUNDER_SCRIPT_URL,
   POPUNDER_COOLDOWN_HOURS: import.meta.env.VITE_POPUNDER_COOLDOWN_HOURS,
+  ENABLE_SOCIAL_BAR: import.meta.env.VITE_ENABLE_SOCIAL_BAR,
+  SOCIAL_BAR_SCRIPT_URL: import.meta.env.VITE_SOCIAL_BAR_SCRIPT_URL,
+  ENABLE_SMARTLINK: import.meta.env.VITE_ENABLE_SMARTLINK,
+  SMARTLINK_URL: import.meta.env.VITE_SMARTLINK_URL,
+  ENABLE_PLAYER_BANNER: import.meta.env.VITE_ENABLE_PLAYER_BANNER,
+  PLAYER_BANNER_ZONE_ID: import.meta.env.VITE_PLAYER_BANNER_ZONE_ID,
+  PLAYER_BANNER_INVOKE_KEY: import.meta.env.VITE_PLAYER_BANNER_INVOKE_KEY,
+  ENABLE_MONETAG_ONCLICK: import.meta.env.VITE_ENABLE_MONETAG_ONCLICK,
+  MONETAG_ONCLICK_URL: import.meta.env.VITE_MONETAG_ONCLICK_URL,
+  ENABLE_MONETAG_INPAGE: import.meta.env.VITE_ENABLE_MONETAG_INPAGE,
+  MONETAG_INPAGE_URL: import.meta.env.VITE_MONETAG_INPAGE_URL,
+  ENABLE_MONETAG_VIGNETTE: import.meta.env.VITE_ENABLE_MONETAG_VIGNETTE,
+  MONETAG_VIGNETTE_URL: import.meta.env.VITE_MONETAG_VIGNETTE_URL,
 };
 
 function coerceUndefined(value: string | null | undefined): string | undefined {
@@ -300,5 +339,24 @@ export function conf(): RuntimeConfig {
     ENABLE_POPUNDER: getKey("ENABLE_POPUNDER", "false") === "true",
     POPUNDER_SCRIPT_URL: getKey("POPUNDER_SCRIPT_URL"),
     POPUNDER_COOLDOWN_HOURS: getKey("POPUNDER_COOLDOWN_HOURS", "3"),
+    ENABLE_SOCIAL_BAR: getKey("ENABLE_SOCIAL_BAR", "false") === "true",
+    SOCIAL_BAR_SCRIPT_URL: getKey("SOCIAL_BAR_SCRIPT_URL"),
+    ENABLE_SMARTLINK: getKey("ENABLE_SMARTLINK", "false") === "true",
+    SMARTLINK_URL: getKey("SMARTLINK_URL"),
+    ENABLE_PLAYER_BANNER: getKey("ENABLE_PLAYER_BANNER", "false") === "true",
+    PLAYER_BANNER_ZONE_ID: getKey("PLAYER_BANNER_ZONE_ID"),
+    PLAYER_BANNER_INVOKE_KEY: getKey("PLAYER_BANNER_INVOKE_KEY"),
+    // Monetag (Onclick + In-Page Push + Vignette Banner — homepage only,
+    // no Push Notifications). Zone scripts are pasted into the env when the
+    // publisher creates them in the Monetag dashboard.
+    ENABLE_MONETAG_ONCLICK:
+      getKey("ENABLE_MONETAG_ONCLICK", "false") === "true",
+    MONETAG_ONCLICK_URL: getKey("MONETAG_ONCLICK_URL"),
+    ENABLE_MONETAG_INPAGE:
+      getKey("ENABLE_MONETAG_INPAGE", "false") === "true",
+    MONETAG_INPAGE_URL: getKey("MONETAG_INPAGE_URL"),
+    ENABLE_MONETAG_VIGNETTE:
+      getKey("ENABLE_MONETAG_VIGNETTE", "false") === "true",
+    MONETAG_VIGNETTE_URL: getKey("MONETAG_VIGNETTE_URL"),
   };
 }

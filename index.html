@@ -103,6 +103,13 @@
 <meta name="darkreader-lock" />
 <meta name="referrer" content="always" />
 
+<!-- Monetag domain verification — token comes from VITE_MONETAG_VERIFICATION_TOKEN.
+     Swap your token into .env.local (local) or the deploy env block (production);
+     the tag renders only when the token exists. -->
+{{#if env.VITE_MONETAG_VERIFICATION_TOKEN }}
+<meta name="monetag" content="{{{ env.VITE_MONETAG_VERIFICATION_TOKEN }}}" />
+{{/if}}
+
 <title>NEXUS — Free Movies, TV Shows & Anime Streaming</title>
 
 {{#if opensearchEnabled }}

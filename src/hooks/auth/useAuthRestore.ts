@@ -31,7 +31,16 @@ export function useAuthRestore() {
 
   const result = useAsync(async () => {
     if (hasRestored.current || !account) return;
-    await restoreWithProfile(account);
+    // Don't hold the app hostage on a slow backend: show the UI after a
+    // short grace period and let the restore finish in the background —
+    // cached local data renders immediately, fresh backend data merges
+    // into the stores when it lands.
+    await Promise.race([
+      restoreWithProfile(account),
+      new Promise((resolve) => {
+        setTimeout(resolve, 1200);
+      }),
+    ]);
   }, []); // no deps because we don't want to it ever rerun after the first time
 
   return result;

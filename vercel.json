@@ -4,6 +4,14 @@
   "installCommand": "pnpm install",
   "rewrites": [
     {
+      "source": "/ads-serve/:path*",
+      "destination": "https://pimplehardnesscarnivorous.com/:path*"
+    },
+    {
+      "source": "/monetag-serve/:path*",
+      "destination": "https://3nbf4.com/:path*"
+    },
+    {
       "source": "/api/stream-proxy/([^?]*)",
       "destination": "/api/stream-proxy?sp=$1"
     },
