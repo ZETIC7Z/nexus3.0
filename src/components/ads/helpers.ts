@@ -146,16 +146,8 @@ export function injectAdScriptViaProxy(
     /* not an absolute URL — treat as path already */
   }
 
-  const s = document.createElement("script");
-  s.src = `/ads-serve${pathname}`;
-  s.async = true;
-  s.dataset.adMarker = marker;
-  s.setAttribute("data-cfasync", "false");
-  Object.entries(attrs).forEach(([k, v]) => {
-    s.dataset[k] = v;
-  });
-  s.addEventListener("error", () => {
-    s.remove();
+  const proxySrc = `/ads-serve${pathname}`;
+  const appendDirectFallback = () => {
     if (document.querySelector(`script[data-ad-fallback="${marker}"]`)) return;
     const fb = document.createElement("script");
     fb.src = scriptUrl;
@@ -164,8 +156,43 @@ export function injectAdScriptViaProxy(
     fb.dataset.adFallback = marker;
     fb.setAttribute("data-cfasync", "false");
     document.head.appendChild(fb);
+  };
+
+  const s = document.createElement("script");
+  s.src = proxySrc;
+  s.async = true;
+  s.dataset.adMarker = marker;
+  s.setAttribute("data-cfasync", "false");
+  Object.entries(attrs).forEach(([k, v]) => {
+    s.dataset[k] = v;
+  });
+  s.addEventListener("error", () => {
+    s.remove();
+    appendDirectFallback();
   });
   document.head.appendChild(s);
+
+  // Some edge proxies return HTTP 200 with an empty body or an HTML
+  // fallback. A script tag may not emit `error` for that case, so validate
+  // the first-party response and switch to the real network URL explicitly.
+  void fetch(proxySrc, { cache: "no-store" })
+    .then(async (response) => {
+      const type = response.headers.get("content-type") || "";
+      const body = await response.text();
+      const valid =
+        response.ok &&
+        /javascript|ecmascript/i.test(type) &&
+        body.trim().length > 0;
+      if (!valid && document.contains(s)) {
+        s.remove();
+        appendDirectFallback();
+      }
+    })
+    .catch(() => {
+      // The script's own error handler handles network failures. Keep the
+      // tag here so a slow-but-valid proxy response is not duplicated.
+    });
+
   return s;
 }
 
